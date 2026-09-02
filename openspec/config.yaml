@@ -1,0 +1,37 @@
+schema: spec-driven
+
+context: |
+  Academic investment management system.
+
+  Backend:
+  - Java
+  - Spring Boot
+  - Maven
+
+  Persistence:
+  - PostgreSQL
+  - Spring Data JPA
+  - Flyway
+
+  Infrastructure:
+  - Docker
+
+  Development:
+  - Spec-Driven Development
+  - OpenSpec
+  - Codex
+
+  Architecture:
+  - layered architecture
+  - controller
+  - service
+  - repository
+  - entity
+  - dto
+  - external APIs isolated through providers/adapters
+
+  Read these documents before proposing significant changes:
+  - docs/product/PRD.md
+  - docs/architecture/ARCHITECTURE.md
+  - docs/decisions/DECISIONS.md
+  - docs/requirements/PROFESSOR_REQUIREMENTS.md
