@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class AcaoServiceTest {
@@ -45,8 +46,7 @@ class AcaoServiceTest {
     void resolveDadosBrasileirosENormalizaTicker() {
         when(selector.para(Mercado.BRASIL)).thenReturn(brazilProvider);
         when(brazilProvider.consultar("PETR4")).thenReturn(data("PETR4", Moeda.BRL));
-        when(repository.existsByTickerAndMercado("PETR4", Mercado.BRASIL)).thenReturn(false);
-        when(repository.saveAndFlush(any(Acao.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(quoteUpdatePersistenceService.cadastrar(any(), eq(Mercado.BRASIL))).thenReturn(acao("PETR4", Mercado.BRASIL));
 
         var result = service.cadastrar(new AcaoRequest(" petr4 ", Mercado.BRASIL));
 
@@ -54,6 +54,7 @@ class AcaoServiceTest {
         assertThat(result.mercado()).isEqualTo(Mercado.BRASIL);
         assertThat(result.moeda()).isEqualTo(Moeda.BRL);
         verify(brazilProvider).consultar("PETR4");
+        verify(quoteUpdatePersistenceService).cadastrar(any(), eq(Mercado.BRASIL));
         verify(usProvider, never()).consultar(any());
     }
 
@@ -61,8 +62,7 @@ class AcaoServiceTest {
     void resolveDadosAmericanosPeloProviderDoMercado() {
         when(selector.para(Mercado.ESTADOS_UNIDOS)).thenReturn(usProvider);
         when(usProvider.consultar("AAPL")).thenReturn(data("AAPL", Moeda.USD));
-        when(repository.existsByTickerAndMercado("AAPL", Mercado.ESTADOS_UNIDOS)).thenReturn(false);
-        when(repository.saveAndFlush(any(Acao.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(quoteUpdatePersistenceService.cadastrar(any(), eq(Mercado.ESTADOS_UNIDOS))).thenReturn(acao("AAPL", Mercado.ESTADOS_UNIDOS));
 
         var result = service.cadastrar(new AcaoRequest(" aapl ", Mercado.ESTADOS_UNIDOS));
 
@@ -70,6 +70,7 @@ class AcaoServiceTest {
         assertThat(result.mercado()).isEqualTo(Mercado.ESTADOS_UNIDOS);
         assertThat(result.moeda()).isEqualTo(Moeda.USD);
         verify(usProvider).consultar("AAPL");
+        verify(quoteUpdatePersistenceService).cadastrar(any(), eq(Mercado.ESTADOS_UNIDOS));
         verify(brazilProvider, never()).consultar(any());
     }
 
@@ -77,12 +78,12 @@ class AcaoServiceTest {
     void usaTickerResolvidoERejeitaDuplicidadeNoMesmoMercado() {
         when(selector.para(Mercado.ESTADOS_UNIDOS)).thenReturn(usProvider);
         when(usProvider.consultar("AAPL")).thenReturn(data("AAPL", Moeda.USD));
-        when(repository.existsByTickerAndMercado("AAPL", Mercado.ESTADOS_UNIDOS)).thenReturn(true);
+        when(quoteUpdatePersistenceService.cadastrar(any(), eq(Mercado.ESTADOS_UNIDOS))).thenThrow(new AcaoDuplicadaException("AAPL"));
 
         assertThatThrownBy(() -> service.cadastrar(new AcaoRequest("aapl", Mercado.ESTADOS_UNIDOS)))
                 .isInstanceOf(AcaoDuplicadaException.class);
 
-        verify(repository, never()).saveAndFlush(any());
+        verify(quoteUpdatePersistenceService).cadastrar(any(), eq(Mercado.ESTADOS_UNIDOS));
     }
 
     @Test
@@ -140,5 +141,9 @@ class AcaoServiceTest {
 
     private StockRegistrationData data(String ticker, Moeda moeda) {
         return new StockRegistrationData(ticker, "Empresa", moeda, new BigDecimal("10.50"), Instant.parse("2026-09-01T12:00:00Z"));
+    }
+
+    private Acao acao(String ticker, Mercado mercado) {
+        return new Acao(ticker, "Empresa", mercado, new BigDecimal("10.50"), Instant.parse("2026-09-01T12:00:00Z"));
     }
 }

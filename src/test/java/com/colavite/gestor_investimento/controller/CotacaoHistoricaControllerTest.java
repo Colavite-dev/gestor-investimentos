@@ -20,6 +20,7 @@ import java.time.Instant;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -61,5 +62,55 @@ class CotacaoHistoricaControllerTest {
         mockMvc.perform(get("/acoes/{id}/historico-cotacoes", acao.getId())
                         .param("de", "2026-09-03T00:00:00Z").param("ate", "2026-09-02T00:00:00Z"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void retornaHistoricoVazioSemFiltros() throws Exception {
+        Acao acao = acoes.saveAndFlush(new Acao("ITUB4", "Itaú", Mercado.BRASIL, new BigDecimal("30"), Instant.now()));
+
+        mockMvc.perform(get("/acoes/{id}/historico-cotacoes", acao.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void filtraComApenasDeEApenasAteIncluindoOsLimites() throws Exception {
+        Acao acao = acoes.saveAndFlush(new Acao("BBAS3", "Banco do Brasil", Mercado.BRASIL, new BigDecimal("20"), Instant.now()));
+        historico.saveAndFlush(new CotacaoHistorica(acao, new BigDecimal("10"), Instant.parse("2026-09-01T00:00:00Z"), Instant.now()));
+        historico.saveAndFlush(new CotacaoHistorica(acao, new BigDecimal("20"), Instant.parse("2026-09-02T00:00:00Z"), Instant.now()));
+        historico.saveAndFlush(new CotacaoHistorica(acao, new BigDecimal("30"), Instant.parse("2026-09-03T00:00:00Z"), Instant.now()));
+
+        mockMvc.perform(get("/acoes/{id}/historico-cotacoes", acao.getId()).param("de", "2026-09-02T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].cotacao").value(20))
+                .andExpect(jsonPath("$[1].cotacao").value(30));
+        mockMvc.perform(get("/acoes/{id}/historico-cotacoes", acao.getId()).param("ate", "2026-09-02T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].cotacao").value(10))
+                .andExpect(jsonPath("$[1].cotacao").value(20));
+    }
+
+    @Test
+    void rejeitaTimestampMalformadoSemAlterarHistorico() throws Exception {
+        Acao acao = acoes.saveAndFlush(new Acao("WEGE3", "Weg", Mercado.BRASIL, new BigDecimal("40"), Instant.now()));
+        long antes = historico.count();
+
+        mockMvc.perform(get("/acoes/{id}/historico-cotacoes", acao.getId()).param("de", "nao-e-um-timestamp"))
+                .andExpect(status().isBadRequest());
+
+        assertThat(historico.count()).isEqualTo(antes);
+    }
+
+    @Test
+    void ordenaEmpatesDeTimestampPorIdCrescente() throws Exception {
+        Acao acao = acoes.saveAndFlush(new Acao("ABEV3", "Ambev", Mercado.BRASIL, new BigDecimal("15"), Instant.now()));
+        Instant instante = Instant.parse("2026-09-02T12:00:00Z");
+        CotacaoHistorica primeira = historico.saveAndFlush(new CotacaoHistorica(acao, new BigDecimal("14"), instante, Instant.now()));
+        CotacaoHistorica segunda = historico.saveAndFlush(new CotacaoHistorica(acao, new BigDecimal("15"), instante, Instant.now()));
+
+        mockMvc.perform(get("/acoes/{id}/historico-cotacoes", acao.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(primeira.getId()))
+                .andExpect(jsonPath("$[1].id").value(segunda.getId()));
     }
 }

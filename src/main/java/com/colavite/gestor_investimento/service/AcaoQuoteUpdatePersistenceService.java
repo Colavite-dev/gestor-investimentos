@@ -1,9 +1,14 @@
 package com.colavite.gestor_investimento.service;
 
 import com.colavite.gestor_investimento.entity.Acao;
+import com.colavite.gestor_investimento.entity.Mercado;
+import com.colavite.gestor_investimento.exception.AcaoDuplicadaException;
 import com.colavite.gestor_investimento.exception.AcaoNotFoundException;
 import com.colavite.gestor_investimento.integration.stock.StockQuoteData;
+import com.colavite.gestor_investimento.integration.stock.StockRegistrationData;
+import com.colavite.gestor_investimento.mapper.AcaoMapper;
 import com.colavite.gestor_investimento.repository.AcaoRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +21,21 @@ class AcaoQuoteUpdatePersistenceService {
     AcaoQuoteUpdatePersistenceService(AcaoRepository repository, CotacaoHistoricaService historico) {
         this.repository = repository;
         this.historico = historico;
+    }
+
+    @Transactional
+    public Acao cadastrar(StockRegistrationData data, Mercado mercado) {
+        if (repository.existsByTickerAndMercado(data.ticker(), mercado)) {
+            throw new AcaoDuplicadaException(data.ticker());
+        }
+        Acao acao;
+        try {
+            acao = repository.saveAndFlush(AcaoMapper.toEntity(data, mercado));
+        } catch (DataIntegrityViolationException exception) {
+            throw new AcaoDuplicadaException(data.ticker());
+        }
+        historico.registrar(acao, data.cotacaoAtual(), data.dataHoraCotacao());
+        return acao;
     }
 
     @Transactional

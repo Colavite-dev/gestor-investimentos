@@ -1,10 +1,6 @@
-# stock-quote-history Specification
+# Delta Specification: stock-quote-history
 
-## Purpose
-
-Registrar e consultar observações históricas de cotações reais utilizadas pelo sistema, preservando uma visão auditável da evolução dos ativos sem depender de chamadas externas durante a consulta.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Registrar observações de cotação
 
@@ -92,12 +88,3 @@ O endpoint de histórico SHALL aceitar opcionalmente os parâmetros `de` e `ate`
 
 - **WHEN** `de` é posterior a `ate`
 - **THEN** o sistema responde `400 Bad Request` e não altera registros
-
-### Requirement: Integridade e escopo do histórico
-
-O sistema MUST vincular cada observação a uma ação existente por chave estrangeira, preservar a moeda da ação por meio da referência ao ativo e não permitir edição ou exclusão pública do histórico. A consulta SHALL ser somente leitura e não converter moedas.
-
-#### Scenario: Moedas distintas
-
-- **WHEN** o cliente consulta históricos de ações BRL e USD separadamente
-- **THEN** cada observação permanece associada à sua ação e nenhuma conversão cambial é aplicada
