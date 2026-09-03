@@ -1,0 +1,5 @@
+package com.colavite.gestor_investimento.repository;
+import com.colavite.gestor_investimento.entity.Operacao;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+public interface OperacaoRepository extends JpaRepository<Operacao, Long> { List<Operacao> findByCarteiraIdOrderByDataOperacaoAscIdAsc(Long carteiraId); }

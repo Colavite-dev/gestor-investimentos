@@ -42,4 +42,28 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().message()).isEqualTo("A fonte cadastral está temporariamente indisponível");
         assertThat(response.getBody().message()).doesNotContain("detalhe remoto");
     }
+
+    @Test
+    void deveRepresentarErrosDeCepSemDetalhesExternos() {
+        ResponseEntity<ApiErrorResponse> notFound = handler.handleCepNotFound(new CepNotFoundException(), request);
+        ResponseEntity<ApiErrorResponse> invalid = handler.handleInvalidCepResponse(new InvalidCepResponseException(new RuntimeException("corpo remoto")), request);
+        ResponseEntity<ApiErrorResponse> unavailable = handler.handleCepProviderUnavailable(new CepProviderUnavailableException(new RuntimeException("host remoto")), request);
+        assertThat(notFound.getStatusCode().value()).isEqualTo(422);
+        assertThat(invalid.getStatusCode().value()).isEqualTo(502);
+        assertThat(unavailable.getStatusCode().value()).isEqualTo(503);
+        assertThat(invalid.getBody().message()).doesNotContain("corpo remoto");
+        assertThat(unavailable.getBody().message()).doesNotContain("host remoto");
+    }
+
+    @Test
+    void deveRepresentarErrosDaCvmSemDetalhesExternos() {
+        ResponseEntity<ApiErrorResponse> rejected = handler.handleCvmParticipantNotAccepted(new CvmParticipantNotAcceptedException(), request);
+        ResponseEntity<ApiErrorResponse> invalid = handler.handleInvalidCvmResponse(new InvalidCvmResponseException(new RuntimeException("zip remoto")), request);
+        ResponseEntity<ApiErrorResponse> unavailable = handler.handleCvmProviderUnavailable(new CvmProviderUnavailableException(new RuntimeException("host remoto")), request);
+        assertThat(rejected.getStatusCode().value()).isEqualTo(422);
+        assertThat(invalid.getStatusCode().value()).isEqualTo(502);
+        assertThat(unavailable.getStatusCode().value()).isEqualTo(503);
+        assertThat(invalid.getBody().message()).doesNotContain("zip remoto");
+        assertThat(unavailable.getBody().message()).doesNotContain("host remoto");
+    }
 }

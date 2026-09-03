@@ -1,171 +1,341 @@
-# AGENTS.md
+## Autonomous SDD Workflow
 
-## Project
+When working autonomously, use the repository as the primary source of project context.
 
-This is an academic investment management system built with Java and Spring Boot.
+Before proposing the next meaningful feature:
 
-Before making meaningful changes, understand the project context.
+1. inspect the current OpenSpec state;
+2. read the relevant stable specs;
+3. read PROFESSOR_REQUIREMENTS.md;
+4. read PRD.md;
+5. consult ARCHITECTURE.md and DECISIONS.md;
+6. inspect the existing implementation and tests;
+7. identify which required behavior is still missing.
 
-## Sources of Truth
+Do not select a new feature merely because it seems useful.
 
-Read the relevant documentation before implementing changes.
+Prioritize:
+1. unfinished mandatory academic requirements;
+2. required integration and validation work;
+3. delivery/documentation requirements;
+4. optional improvements and differentiators.
 
-Product requirements:
+## OpenSpec Lifecycle
 
-docs/product/PRD.md
+For meaningful features, follow:
 
-Original academic requirements:
+Explore → Propose → Review → Apply → Validate → Review → Sync → Archive
 
-docs/requirements/PROFESSOR_REQUIREMENTS.md
+### Explore / Propose
 
-Architecture:
+When asked to continue development and no specific change was provided:
 
-docs/architecture/ARCHITECTURE.md
+1. inspect the repository;
+2. identify the next logical unfinished requirement;
+3. explain any important ambiguity;
+4. create an OpenSpec change;
+5. create proposal.md;
+6. create design.md;
+7. create tasks.md;
+8. create only the necessary delta specs;
+9. validate the change with OpenSpec strict.
 
-Project decisions:
+Do not implement production code during PROPOSE.
 
-docs/decisions/DECISIONS.md
+After PROPOSE:
+- report the proposed change;
+- report architectural decisions;
+- report task count;
+- report affected specs;
+- report expected tests;
+- report migrations if any;
+- report blockers.
 
-OpenSpec changes:
+STOP and wait for approval before APPLY.
 
-openspec/changes/
+### Apply
 
-Stable system specifications:
+After explicit approval:
 
-openspec/specs/
+1. read the complete approved change;
+2. inspect affected implementation;
+3. implement all approved tasks;
+4. keep tasks.md updated;
+5. run focused tests during development;
+6. avoid repeatedly running the full build after small edits;
+7. run the full Maven verification near the end;
+8. validate the OpenSpec change with strict validation;
+9. compare implementation against the approved specs.
 
-## Development Method
+Fix failures directly caused by the change autonomously when safe.
 
-This project follows Spec-Driven Development.
+Do not expand scope to unrelated features.
 
-Do not implement a meaningful feature without checking whether an OpenSpec change exists for it.
+After APPLY:
+- report completed tasks;
+- report files changed;
+- report tests executed;
+- report build result;
+- report OpenSpec validation;
+- report deviations or blockers.
 
-When an OpenSpec change exists:
+STOP before sync/archive and wait for approval.
 
-1. read proposal.md;
-2. read the relevant specs;
-3. read design.md;
-4. read tasks.md;
-5. implement only the approved scope;
-6. update tasks as work is completed;
-7. run relevant tests;
-8. report deviations or blockers.
+### Sync / Archive
 
-Do not silently expand scope.
+Only after explicit approval:
 
-## Academic Requirements
+1. sync the delta specs into stable specs;
+2. validate the resulting stable specs;
+3. archive the completed change;
+4. confirm that no completed change remains active.
 
-The requirements from the professor must not be ignored.
+Do not modify the approved implementation during archive unless required to correct a directly related specification problem.
 
-If a requested change conflicts with:
+## Validation Strategy
 
-docs/requirements/PROFESSOR_REQUIREMENTS.md
+Use focused validation during implementation.
 
-or:
+Run `mvn verify` once near the end of APPLY unless a failure requires another run.
 
-docs/product/PRD.md
+Do not repeatedly start PostgreSQL/Docker merely as a routine check.
 
-do not silently choose one.
+Real PostgreSQL validation is especially relevant when changing:
+- Flyway migrations;
+- JPA mappings;
+- database constraints;
+- datasource/database infrastructure.
 
-Report the conflict.
+If none of these changed, existing automated tests may be sufficient unless the feature specifically requires database verification.
 
-## Architecture
+## External Integration Tests
 
-Follow the architecture documented in:
+Normal automated tests must not depend on internet availability.
 
-docs/architecture/ARCHITECTURE.md
+Use mocks/test doubles for normal provider tests.
 
-Controllers must not contain business logic.
+Real external API tests must be opt-in.
 
-JPA entities must not be used directly as API request/response contracts.
+Run real provider tests only when they provide meaningful validation of:
+- authentication;
+- endpoint contract;
+- parser compatibility;
+- provider-specific behavior.
 
-External APIs must be isolated behind internal abstractions.
+Avoid unnecessary real API calls because providers may have rate limits.
 
-Business services must not depend directly on external API DTOs.
+Never print API keys or tokens.
 
-## External APIs
+## Repository Consistency
 
-Never expose API keys or tokens in source code.
+When determining expected behavior, consider:
 
-Use configuration/environment variables.
+1. mandatory academic requirements;
+2. approved product requirements;
+3. stable OpenSpec specifications;
+4. architecture and recorded decisions;
+5. current implementation and tests.
 
-External provider failures must be handled deliberately.
+These sources serve different purposes and must not be silently overwritten by one another.
 
-Do not assume an external API is always available.
+If they conflict in a way that changes required behavior, report the conflict before proceeding.
 
-Do not create fake external data as a substitute for required integrations.
+Stable OpenSpec specs describe behavior already accepted into the system.
 
-## Database
+Current code is implementation evidence, not permission to override an approved specification.
 
-PostgreSQL is the primary database.
+## Scope Control
 
-Flyway owns schema evolution.
+Do not implement future features while completing the current change.
 
-Do not use Hibernate automatic schema creation as the official database migration mechanism.
+Do not add:
+- speculative abstractions;
+- unrelated refactors;
+- optional libraries;
+- new database structures;
+- new external providers;
 
-Never modify an already-applied migration to represent a new schema change.
+unless required by the approved change.
 
-Create a new migration instead.
+Prefer reusing existing abstractions and conventions.
 
-## Secrets
+## Git and Destructive Operations
 
-Never place secrets in:
+Unless explicitly requested, do not:
 
-- source code;
-- committed configuration;
-- documentation;
-- examples.
+- commit;
+- push;
+- pull;
+- merge;
+- rebase;
+- force push;
+- publish releases;
+- deploy;
+- delete database volumes;
+- perform destructive database operations;
+- change global Git configuration;
+- install global system dependencies.
 
-Use environment variables.
+Do not use destructive commands such as database volume deletion merely to obtain a clean environment.
 
-`.env.example` must contain variable names only and no real credentials.
+## Autonomous Decisions
 
-## Testing
+Small, reversible implementation decisions that are already constrained by the approved design may be made autonomously.
 
-New business rules should have relevant automated tests.
+Do not stop for confirmation for:
+- naming local implementation details;
+- adding focused tests;
+- fixing compilation errors caused by the current change;
+- correcting formatting;
+- small refactors necessary to implement the approved design.
 
-External APIs should normally be mocked or replaced by test doubles in automated tests.
+Stop and report before proceeding when:
+- requirements materially conflict;
+- a destructive operation appears necessary;
+- a new migration was not anticipated;
+- public API behavior would materially differ from the proposal;
+- an external provider contract invalidates the approved design;
+- secrets or credentials would need unsafe handling;
+- scope would need to expand substantially.
 
-After implementation:
+## Git and GitHub Responsibility
 
-- run relevant unit tests;
-- run relevant integration tests;
-- run the project build when practical.
+Codex is also responsible for helping maintain the local Git repository and GitHub remote safely.
 
-Do not state that a task is complete when tests are failing unless the failure is clearly reported.
+Git/GitHub work is separate from feature implementation.
 
-## Code Quality
+Before any write operation involving Git or GitHub:
 
-Prefer simple and explicit solutions.
+1. inspect the current repository state;
+2. inspect local branches;
+3. inspect configured remotes;
+4. inspect differences between local and remote history;
+5. inspect tracked, modified and untracked files;
+6. inspect `.gitignore`;
+7. verify that secrets and local-only files are not included;
+8. explain the planned operation and its risks.
 
-Avoid unnecessary abstractions.
+Read-only Git operations may be performed autonomously, including:
 
-Do not introduce a library unless it solves a concrete project need.
+- git status
+- git diff
+- git diff --cached
+- git log
+- git branch
+- git remote -v
+- git fetch
+- git ls-files
+- git show
+- git rev-list
+- git merge-base
 
-Follow existing naming and package conventions.
+`git fetch` is allowed because it updates remote-tracking references without modifying the working tree.
 
-Keep classes focused on a single responsibility.
+Do NOT automatically perform:
 
-Avoid duplicating business rules.
+- git add
+- git commit
+- git push
+- git pull
+- git merge
+- git rebase
+- git reset
+- git clean
+- git restore that discards changes
+- git checkout that discards changes
+- force push
+- branch deletion
+- tag deletion
+- history rewriting
 
-## Change Discipline
+without explicit approval.
 
-Before editing code:
+Never use `git push --force` or `--force-with-lease` unless explicitly authorized for a specific operation.
 
-1. inspect the existing implementation;
-2. inspect the relevant OpenSpec change;
-3. identify affected components.
+Never discard local work to make the repository clean.
 
-During implementation:
+Never delete untracked files unless their purpose has been reviewed and explicit approval was given.
 
-1. make small coherent changes;
-2. preserve unrelated behavior;
-3. avoid speculative features.
+## GitHub Safety
 
-After implementation:
+Before pushing:
 
-1. run validation;
-2. compare the result with the spec;
-3. report changed files;
-4. report tests executed;
-5. report unresolved issues.
+1. fetch the remote;
+2. compare local `main` with `origin/main`;
+3. determine whether the branches are:
+    - synchronized;
+    - local ahead;
+    - remote ahead;
+    - diverged;
+4. inspect the commits on each side;
+5. verify that the commit does not include secrets;
+6. verify that build artifacts, IDE files and local configuration are excluded.
+
+If local and remote history diverge:
+
+STOP.
+
+Do not automatically pull, merge, rebase or force push.
+
+Report:
+
+- common ancestor;
+- local-only commits;
+- remote-only commits;
+- modified files;
+- untracked files;
+- safest reconciliation options.
+
+Wait for approval.
+
+## Secrets Before Commit
+
+Before staging or committing, inspect for likely secrets.
+
+At minimum verify:
+
+- `.env` is ignored;
+- `.env.backup` is ignored;
+- API keys are not tracked;
+- database passwords are not tracked;
+- tokens are not tracked;
+- local IDE/runtime artifacts are not accidentally included.
+
+Never display actual secret values in reports.
+
+If a secret appears to be tracked:
+
+STOP before commit or push.
+
+Report the file and type of secret without reproducing the credential.
+
+## Commit Discipline
+
+When a commit is explicitly approved:
+
+- include only reviewed project files;
+- avoid unrelated local files;
+- do not mix generated artifacts with source changes unless needed;
+- use a concise descriptive commit message;
+- show the staged diff summary before committing;
+- report the resulting commit hash.
+
+Do not commit automatically at the end of every OpenSpec change unless explicitly requested.
+
+## Push Discipline
+
+When a push is explicitly approved:
+
+1. fetch first;
+2. verify local/remote relationship again;
+3. push only the intended branch;
+4. never force by default;
+5. report the remote and resulting branch state.
+
+If the push is rejected:
+
+STOP.
+
+Do not automatically force, rebase, reset or merge.
+
+Investigate and report the reason.

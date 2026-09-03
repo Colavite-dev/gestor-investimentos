@@ -106,7 +106,7 @@ class BrasilApiCnpjAdapterTest {
     void deveRejeitarCampoObrigatorioAusenteOuAcimaDoLimite() {
         BrasilApiCnpjAdapter adapter = adapterWithMockServer();
         server.expect(once(), requestTo("http://brasil.test/api/cnpj/v1/" + CNPJ))
-                .andRespond(withSuccess(validJson().replace("\"bairro\": \"BELA VISTA\"", "\"bairro\": null"),
+                .andRespond(withSuccess(validJson().replace("\"razao_social\": \"OPEN KNOWLEDGE BRASIL\"", "\"razao_social\": null"),
                         MediaType.APPLICATION_JSON));
 
         assertThatThrownBy(() -> adapter.consultar(CNPJ))

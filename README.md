@@ -136,7 +136,7 @@ Exemplo de request:
 
 O CNPJ pode ser enviado com máscara ou com 14 dígitos no `POST`. A aplicação valida os dígitos verificadores, normaliza o valor, verifica duplicidade e consulta `GET /api/cnpj/v1/{cnpj}` da BrasilAPI. Propriedades adicionais no request são rejeitadas para impedir a sobrescrita dos dados cadastrais.
 
-Os campos `razaoSocial`, `nomeFantasia`, `email`, `telefone`, `cep`, `logradouro`, `numero`, `complemento`, `bairro`, `cidade`, `uf` e `situacaoCadastral` vêm da resposta cadastral. CEP é armazenado somente com dígitos, UF em letras maiúsculas e campos opcionais vazios como `null`. `id`, `dataCadastro` e `validadaNaCvm` continuam controlados pelo sistema.
+Os campos empresariais e o CEP vêm da resposta cadastral de CNPJ. O ViaCEP valida esse CEP e só completa `logradouro`, `bairro`, `cidade` e `uf` quando a fonte cadastral os retorna ausentes; nunca sobrescreve valores cadastrais não vazios, nem inventa número ou complemento. Divergência de cidade ou UF entre as fontes interrompe o cadastro para evitar persistência geograficamente inconsistente. CEP é armazenado somente com dígitos, UF em letras maiúsculas e campos opcionais vazios como `null`. `id`, `dataCadastro` e `validadaNaCvm` continuam controlados pelo sistema.
 
 A resposta contém todos os campos persistidos, incluindo:
 
@@ -144,7 +144,7 @@ A resposta contém todos os campos persistidos, incluindo:
 {
   "id": 1,
   "cnpj": "11222333000181",
-  "validadaNaCvm": false,
+  "validadaNaCvm": true,
   "dataCadastro": "2026-09-01T18:00:00Z"
 }
 ```
@@ -171,12 +171,75 @@ O provider inicial usa os seguintes defaults, sobrescrevíveis por variáveis de
 | `BRASIL_API_BASE_URL` | `https://brasilapi.com.br` | URL base do provider |
 | `BRASIL_API_CONNECT_TIMEOUT` | `2s` | Limite para estabelecer conexão |
 | `BRASIL_API_READ_TIMEOUT` | `5s` | Limite para receber a resposta |
+| `VIA_CEP_BASE_URL` | `https://viacep.com.br` | URL base do provider de CEP |
+| `VIA_CEP_CONNECT_TIMEOUT` | `2s` | Limite para estabelecer conexão com ViaCEP |
+| `VIA_CEP_READ_TIMEOUT` | `5s` | Limite para receber a resposta do ViaCEP |
+| `CVM_PARTICIPANTS_DATASET_URL` | `https://dados.cvm.gov.br/dados/INTERMED/CAD/DADOS/cad_intermed.zip` | ZIP diário oficial de Participantes Intermediários |
+| `CVM_PARTICIPANTS_CONNECT_TIMEOUT` | `2s` | Limite para estabelecer conexão com a CVM |
+| `CVM_PARTICIPANTS_READ_TIMEOUT` | `10s` | Limite para receber o dataset da CVM |
+| `CVM_PARTICIPANTS_REFRESH_INTERVAL` | `24h` | Janela de reutilização do snapshot local da CVM |
+| `BRAPI_TOKEN` | vazio | Token opcional da brapi, enviado somente ao provider brasileiro |
+| `TWELVE_DATA_API_KEY` | vazio | Chave da Twelve Data, necessária somente para ações dos Estados Unidos |
+| `TWELVE_DATA_BASE_URL` | `https://api.twelvedata.com` | URL base da Twelve Data |
+| `TWELVE_DATA_CONNECT_TIMEOUT` | `2s` | Limite para estabelecer conexão com a Twelve Data |
+| `TWELVE_DATA_READ_TIMEOUT` | `5s` | Limite para receber a resposta da Twelve Data |
 
-Não há retry automático. A BrasilAPI não exige credencial para esse endpoint e nenhum token ou corpo de erro externo é exposto pela nossa API.
+Não há retry automático. BrasilAPI e ViaCEP não exigem credenciais para esses endpoints; nenhum token ou corpo de erro externo é exposto pela nossa API. CEP inexistente retorna `422`; resposta de CEP inválida ou conflito geográfico retorna `502`; indisponibilidade, timeout e erros técnicos retornam `503`.
 
-Esta integração usa os dados de endereço presentes na própria resposta de CNPJ, mas ainda não realiza uma consulta específica a provider de CEP. Todo registro continua criado com `validadaNaCvm=false`; portanto, a consulta cadastral não confirma que a instituição está autorizada a atuar no mercado financeiro. CEP e CVM permanecem em mudanças futuras separadas.
+Depois da BrasilAPI e do ViaCEP, o cadastro consulta o dataset diário **Participantes Intermediários: Informação Cadastral** da CVM. O CNPJ normalizado precisa estar em registro ativo e em categoria de Corretora ou Distribuidora de títulos e valores mobiliários. O ZIP é processado em um snapshot local indexado por CNPJ e reutilizado até a janela configurada; não há download por cadastro, nem credenciais. A CVM apenas completa essa validação: BrasilAPI continua sendo a fonte cadastral empresarial e ViaCEP continua sendo a validação/enriquecimento de endereço.
 
-Os testes automatizados substituem o port interno e não chamam a BrasilAPI real. A validação real do adapter é opt-in e deve ser executada somente de forma controlada.
+Somente o registro aceito pela CVM é persistido com `validadaNaCvm=true`. Participante ausente, inativo ou de categoria incompatível retorna `422`; ZIP/CSV incompatível retorna `502`; timeout, rate limit, conexão e indisponibilidade retornam `503`. Nenhuma resposta expõe conteúdo ou detalhes internos da CVM.
+
+Os testes automatizados substituem os ports internos e não chamam BrasilAPI, ViaCEP ou CVM reais. A validação real da CVM é opt-in e pode ser executada de forma controlada com `-Dtest=CvmParticipantRealIT -DrunCvmRealIT=true test`.
+
+## API de ações
+
+Esta etapa cria o cadastro mestre de ações, sem representar compras, vendas, carteira ou vínculo com Corretora. A identidade do ativo é `(ticker, mercado)`; portanto, o mesmo ticker pode existir uma vez no Brasil e outra nos Estados Unidos.
+
+`POST /acoes` recebe o ticker e o mercado para selecionar deterministicamente a fonte externa. Nenhum dado cadastral ou de cotação pode ser enviado manualmente:
+
+```json
+{
+  "ticker": "PETR4",
+  "mercado": "BRASIL"
+}
+```
+
+Para Brasil, a aplicação consulta `GET /api/v2/stocks/quote` da brapi, persiste o ticker canônico quando houver renome e exige moeda `BRL`.
+
+```json
+{
+  "ticker": "AAPL",
+  "mercado": "ESTADOS_UNIDOS"
+}
+```
+
+Para Estados Unidos, a aplicação consulta `/symbol_search` e `/quote` da Twelve Data. O instrumento precisa ter correspondência exata de ticker, `country` igual a `United States`, `instrument_type` igual a `Common Stock` e moeda `USD`; a cotação usa `symbol`, `name`, `currency`, `close` e `timestamp`. A fonte completa somente dados externos válidos: nome, moeda, cotação e data/hora não podem ser sobrescritos pelo cliente.
+
+`BRAPI_TOKEN` é opcional e deve ficar apenas no ambiente local. Quando presente, é enviado como `Authorization: Bearer`. `TWELVE_DATA_API_KEY` também deve existir somente no ambiente local e é enviada exclusivamente como `Authorization: apikey`; operações brasileiras não dependem dessa chave. Nenhuma credencial deve ser registrada em código, documentação ou logs. Ticker ou instrumento incompatível retorna `422`; resposta externa incompatível retorna `502`; rate limit, timeout e indisponibilidade retornam `503`.
+
+Os testes reais são opt-in e não pertencem à suíte normal: brapi com `-Dtest=BrapiStockRealIT -DrunBrapiRealIT=true test` e Twelve Data com `-Dtest=TwelveDataStockRealIT -DrunTwelveDataRealIT=true test`.
+
+Os endpoints disponíveis são `POST /acoes`, `GET /acoes`, `GET /acoes/{id}`, `GET /acoes/ticker/{ticker}` e `PUT /acoes/{id}/atualizar-cotacao`. A busca por ticker aceita `?mercado=BRASIL` ou `?mercado=ESTADOS_UNIDOS`; sem o parâmetro, retorna o ativo somente quando o ticker não é ambíguo.
+
+### Atualizar cotação
+
+`PUT /acoes/{id}/atualizar-cotacao` não recebe corpo. O mercado persistido seleciona diretamente o provider: brapi para `BRASIL` e Twelve Data para `ESTADOS_UNIDOS`. A operação faz uma única consulta de cotação, atualiza exclusivamente `cotacaoAtual` e `dataHoraCotacao` e preserva ticker, mercado, nome da empresa e moeda.
+
+```text
+PUT /acoes/1/atualizar-cotacao
+```
+
+A resposta é `200 OK` com a representação atualizada da ação. Ação inexistente retorna `404`; ticker não consultável retorna `422`; dados externos incompatíveis retornam `502`; timeout, rate limit, indisponibilidade e configuração externa necessária retornam `503`. Para ação americana já cadastrada, a atualização consulta somente `/quote`, sem nova chamada a `/symbol_search`.
+
+## Entregáveis acadêmicos
+
+Os artefatos complementares da entrega estão disponíveis em:
+
+- [Coleção Postman da API](docs/api/gestor-investimento.postman_collection.json): importe o arquivo no Postman e ajuste apenas a variável `baseUrl` para o ambiente local. A coleção não contém credenciais.
+- [Diagrama simplificado de entidades](docs/architecture/entity-model.md): arquivo Markdown com diagrama Mermaid visualizável no GitHub ou em editor compatível.
+
+A coleção reúne exemplos dos endpoints atuais de corretoras e ações, incluindo cadastro, consultas, atualização de cotação, requests inválidos, recursos inexistentes e duplicidade. Configure localmente quaisquer variáveis de ambiente exigidas pela aplicação conforme a seção de configuração; não copie senhas ou tokens para a coleção ou para o repositório.
 
 ### Parar o ambiente
 
@@ -191,3 +254,23 @@ O comando abaixo também remove o volume e apaga os dados locais. Use-o somente 
 ```powershell
 docker compose --env-file .env down -v
 ```
+
+## HistÃ³rico de cotaÃ§Ãµes
+
+O endpoint `GET /acoes/{id}/historico-cotacoes` consulta as observaÃ§Ãµes reais usadas no cadastro e nas atualizaÃ§Ãµes de cotaÃ§Ã£o. O resultado Ã© somente leitura e ordenado pelo timestamp da fonte e, em empate, pelo identificador.
+
+```text
+GET /acoes/1/historico-cotacoes?de=2026-09-01T00:00:00Z&ate=2026-09-30T23:59:59Z
+```
+
+Os parÃ¢metros `de` e `ate` sÃ£o opcionais e usam ISO-8601; intervalo invertido retorna `400`. AÃ§Ã£o inexistente retorna `404`. O histÃ³rico nÃ£o consulta providers, nÃ£o permite alteraÃ§Ã£o ou exclusÃ£o e nÃ£o converte moedas.
+
+## Carteiras
+
+O cadastro inicial de carteiras está disponível em `POST /carteiras`, `GET /carteiras` e `GET /carteiras/{id}`. O POST recebe `nome` obrigatório e `descricao` opcional; o nome é normalizado para impedir duplicidade. Operações, posições e cálculos de patrimônio serão adicionados posteriormente.
+## OperaÃ§Ãµes
+
+Registre compras e vendas em `POST /operacoes` informando `carteiraId`, `acaoId`, `tipo` (`COMPRA` ou `VENDA`), `quantidade`, `precoUnitario` e `dataOperacao`. Consulte uma operaÃ§Ã£o em `GET /operacoes/{id}` ou liste as operaÃ§Ãµes de uma carteira em `GET /carteiras/{id}/operacoes`. Esta versÃ£o registra os fatos transacionais, sem calcular posiÃ§Ã£o, preÃ§o mÃ©dio ou patrimÃ´nio.
+## Posições e resumo
+
+Consulte `GET /carteiras/{id}/posicoes` para posições agregadas por ação e `GET /carteiras/{id}/resumo` para totais separados por moeda. Os cálculos usam operações e a última cotação persistida, sem conversão cambial ou chamadas externas.

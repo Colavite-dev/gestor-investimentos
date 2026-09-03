@@ -74,12 +74,62 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(AcaoNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleAcaoNotFound(AcaoNotFoundException exception, HttpServletRequest request) {
+        return response(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
+    }
+
     @ExceptionHandler(CnpjDuplicadoException.class)
     public ResponseEntity<ApiErrorResponse> handleConflict(
             CnpjDuplicadoException exception,
             HttpServletRequest request
     ) {
         return response(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(AcaoDuplicadaException.class)
+    public ResponseEntity<ApiErrorResponse> handleAcaoDuplicada(AcaoDuplicadaException exception, HttpServletRequest request) {
+        return response(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(CarteiraNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleCarteiraNotFound(CarteiraNotFoundException exception, HttpServletRequest request) {
+        return response(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(CarteiraDuplicadaException.class)
+    public ResponseEntity<ApiErrorResponse> handleCarteiraDuplicada(CarteiraDuplicadaException exception, HttpServletRequest request) {
+        return response(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(OperacaoNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleOperacaoNotFound(OperacaoNotFoundException exception, HttpServletRequest request) {
+        return response(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(TickerAmbiguoException.class)
+    public ResponseEntity<ApiErrorResponse> handleTickerAmbiguo(TickerAmbiguoException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(StockTickerNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleStockTickerNotFound(StockTickerNotFoundException exception, HttpServletRequest request) {
+        return response(HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(InvalidStockDataResponseException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidStockData(InvalidStockDataResponseException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_GATEWAY, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(StockProviderUnavailableException.class)
+    public ResponseEntity<ApiErrorResponse> handleStockUnavailable(StockProviderUnavailableException exception, HttpServletRequest request) {
+        return response(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(InvalidQuoteHistoryRangeException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidQuoteHistoryRange(InvalidQuoteHistoryRangeException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());
     }
 
     @ExceptionHandler(CnpjNotFoundException.class)
@@ -103,6 +153,36 @@ public class GlobalExceptionHandler {
             CnpjProviderUnavailableException exception,
             HttpServletRequest request
     ) {
+        return response(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(CepNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleCepNotFound(CepNotFoundException exception, HttpServletRequest request) {
+        return response(HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(InvalidCepResponseException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidCepResponse(InvalidCepResponseException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_GATEWAY, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(CepProviderUnavailableException.class)
+    public ResponseEntity<ApiErrorResponse> handleCepProviderUnavailable(CepProviderUnavailableException exception, HttpServletRequest request) {
+        return response(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(CvmParticipantNotAcceptedException.class)
+    public ResponseEntity<ApiErrorResponse> handleCvmParticipantNotAccepted(CvmParticipantNotAcceptedException exception, HttpServletRequest request) {
+        return response(HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(InvalidCvmResponseException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidCvmResponse(InvalidCvmResponseException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_GATEWAY, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(CvmProviderUnavailableException.class)
+    public ResponseEntity<ApiErrorResponse> handleCvmProviderUnavailable(CvmProviderUnavailableException exception, HttpServletRequest request) {
         return response(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request, Map.of());
     }
 

@@ -66,12 +66,12 @@ public class BrasilApiCnpjAdapter implements CnpjDataProvider {
                 optionalEmail(response.email()),
                 optionalPhone(response.telefone()),
                 requiredDigits(response.cep(), 8),
-                required(response.logradouro(), 150),
+                optional(response.logradouro(), 150),
                 required(response.numero(), 20),
                 optional(response.complemento(), 100),
-                required(response.bairro(), 100),
-                required(response.municipio(), 100),
-                requiredUf(response.uf()),
+                optional(response.bairro(), 100),
+                optional(response.municipio(), 100),
+                optionalUf(response.uf()),
                 required(response.situacaoCadastral(), 30)
         );
     }
@@ -130,6 +130,14 @@ public class BrasilApiCnpjAdapter implements CnpjDataProvider {
         if (!uf.matches("[A-Z]{2}")) {
             throw new InvalidCnpjResponseException();
         }
+        return uf;
+    }
+
+    private String optionalUf(String value) {
+        String uf = optional(value, 2);
+        if (uf == null) return null;
+        uf = uf.toUpperCase(Locale.ROOT);
+        if (!uf.matches("[A-Z]{2}")) throw new InvalidCnpjResponseException();
         return uf;
     }
 }

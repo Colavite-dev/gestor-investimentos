@@ -107,7 +107,10 @@ public class Corretora {
         if (dataCadastro == null) {
             dataCadastro = Instant.now();
         }
-        validadaNaCvm = false;
+    }
+
+    public void marcarValidadaNaCvm() {
+        validadaNaCvm = true;
     }
 
     public Long getId() {

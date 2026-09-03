@@ -1,0 +1,133 @@
+{
+  "info": {
+    "_postman_id": "5d76f4f7-6db4-4f6e-9d8c-gestor-investimento",
+    "name": "Gestor Investimento API",
+    "description": "Requests de demonstração dos endpoints atuais. Configure apenas a variável baseUrl; credenciais de providers externos não são necessárias nesta coleção.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "acaoId", "value": "1" },
+    { "key": "corretoraId", "value": "1" },
+    { "key": "cnpj", "value": "<CNPJ_VALIDO_LOCAL>" }
+  ],
+  "item": [
+    {
+      "name": "Corretoras",
+      "item": [
+        {
+          "name": "Cadastrar corretora",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"cnpj\": \"{{cnpj}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/corretoras", "host": ["{{baseUrl}}"], "path": ["corretoras"] }
+          }
+        },
+        {
+          "name": "Listar corretoras",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/corretoras", "host": ["{{baseUrl}}"], "path": ["corretoras"] } }
+        },
+        {
+          "name": "Buscar corretora por ID",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/corretoras/{{corretoraId}}", "host": ["{{baseUrl}}"], "path": ["corretoras", "{{corretoraId}}"] } }
+        },
+        {
+          "name": "Buscar corretora por CNPJ",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/corretoras/cnpj/{{cnpj}}", "host": ["{{baseUrl}}"], "path": ["corretoras", "cnpj", "{{cnpj}}"] } }
+        },
+        {
+          "name": "Exemplo de request inválido",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"cnpj\": \"000\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/corretoras", "host": ["{{baseUrl}}"], "path": ["corretoras"] }
+          }
+        },
+        {
+          "name": "Exemplo de recurso inexistente",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/corretoras/999999", "host": ["{{baseUrl}}"], "path": ["corretoras", "999999"] } }
+        },
+        {
+          "name": "Exemplo de duplicidade",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"cnpj\": \"{{cnpj}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/corretoras", "host": ["{{baseUrl}}"], "path": ["corretoras"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ações",
+      "item": [
+        {
+          "name": "Cadastrar ação brasileira",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ticker\": \"PETR4\",\n  \"mercado\": \"BRASIL\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/acoes", "host": ["{{baseUrl}}"], "path": ["acoes"] }
+          }
+        },
+        {
+          "name": "Cadastrar ação americana",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ticker\": \"AAPL\",\n  \"mercado\": \"ESTADOS_UNIDOS\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/acoes", "host": ["{{baseUrl}}"], "path": ["acoes"] }
+          }
+        },
+        {
+          "name": "Listar ações",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/acoes", "host": ["{{baseUrl}}"], "path": ["acoes"] } }
+        },
+        {
+          "name": "Buscar ação por ID",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/acoes/{{acaoId}}", "host": ["{{baseUrl}}"], "path": ["acoes", "{{acaoId}}"] } }
+        },
+        {
+          "name": "Buscar ação por ticker e mercado",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/acoes/ticker/PETR4?mercado=BRASIL", "host": ["{{baseUrl}}"], "path": ["acoes", "ticker", "PETR4"], "query": [{ "key": "mercado", "value": "BRASIL" }] } }
+        },
+        {
+          "name": "Buscar ação por ticker",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/acoes/ticker/AAPL?mercado=ESTADOS_UNIDOS", "host": ["{{baseUrl}}"], "path": ["acoes", "ticker", "AAPL"], "query": [{ "key": "mercado", "value": "ESTADOS_UNIDOS" }] } }
+        },
+        {
+          "name": "Atualizar cotação",
+          "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/acoes/{{acaoId}}/atualizar-cotacao", "host": ["{{baseUrl}}"], "path": ["acoes", "{{acaoId}}", "atualizar-cotacao"] } }
+        },
+        {
+          "name": "Histórico de cotações",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/acoes/{{acaoId}}/historico-cotacoes", "host": ["{{baseUrl}}"], "path": ["acoes", "{{acaoId}}", "historico-cotacoes"] } }
+        },
+        {
+          "name": "Exemplo de request inválido",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ticker\": \"PETR4\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/acoes", "host": ["{{baseUrl}}"], "path": ["acoes"] }
+          }
+        },
+        {
+          "name": "Exemplo de recurso inexistente",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/acoes/999999", "host": ["{{baseUrl}}"], "path": ["acoes", "999999"] } }
+        },
+        {
+          "name": "Exemplo de duplicidade",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ticker\": \"PETR4\",\n  \"mercado\": \"BRASIL\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/acoes", "host": ["{{baseUrl}}"], "path": ["acoes"] }
+          }
+        }
+      ]
+    }
+  ]
+}
