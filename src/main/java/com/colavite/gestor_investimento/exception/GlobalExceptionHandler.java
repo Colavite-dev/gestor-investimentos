@@ -107,6 +107,11 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(SaldoInsuficienteParaVendaException.class)
+    public ResponseEntity<ApiErrorResponse> handleSaldoInsuficienteParaVenda(SaldoInsuficienteParaVendaException exception, HttpServletRequest request) {
+        return response(HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage(), request, Map.of());
+    }
+
     @ExceptionHandler(TickerAmbiguoException.class)
     public ResponseEntity<ApiErrorResponse> handleTickerAmbiguo(TickerAmbiguoException exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());

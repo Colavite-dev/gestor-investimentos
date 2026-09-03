@@ -1,10 +1,6 @@
-# operation-management Specification
+# Delta Specification: operation-management
 
-## Purpose
-
-Registrar compras e vendas de ativos em carteiras, preservando os fatos transacionais necessários para futuras posições e cálculos de desempenho.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Registrar operação
 
@@ -65,44 +61,10 @@ O sistema MUST permitir criar uma operação informando carteira, ação, tipo `
 - **WHEN** tipo é ausente ou incompatível, quantidade ou preço não são positivos, ou data é ausente ou inválida
 - **THEN** o sistema retorna `400 Bad Request` sem persistir
 
-### Requirement: Validar referências
+## REMOVED Requirements
 
-O sistema MUST rejeitar operação que aponte para carteira ou ação inexistente e MUST preservar as referências originais, sem criar entidades relacionadas automaticamente.
+### Requirement: Adiar cálculos
 
-#### Scenario: Carteira inexistente
+**Reason**: A integridade histórica de saldo é regra obrigatória de registro de venda, e não uma projeção opcional de posição.
 
-- **WHEN** o cliente informa carteira não cadastrada
-- **THEN** o sistema retorna `404 Not Found` sem persistir a operação
-
-#### Scenario: Ação inexistente
-
-- **WHEN** o cliente informa ação não cadastrada
-- **THEN** o sistema retorna `404 Not Found` sem persistir a operação
-
-### Requirement: Consultar operações
-
-O sistema MUST permitir consultar uma operação por ID e listar operações de uma carteira em ordem crescente de data e ID, retornando DTOs.
-
-#### Scenario: Consulta existente
-
-- **WHEN** o cliente consulta `GET /operacoes/{id}` para operação existente
-- **THEN** o sistema retorna `200 OK` com seus dados
-
-#### Scenario: Listagem da carteira
-
-- **WHEN** o cliente consulta `GET /carteiras/{carteiraId}/operacoes`
-- **THEN** o sistema retorna `200 OK` com as operações da carteira ordenadas
-
-#### Scenario: Operação inexistente
-
-- **WHEN** o cliente consulta ID de operação não cadastrada
-- **THEN** o sistema retorna `404 Not Found`
-
-### Requirement: Integridade transacional
-
-O sistema MUST persistir tipo, quantidade, preço unitário, data, carteira e ação com chaves estrangeiras e não deve apagar ou alterar operações nesta capacidade.
-
-#### Scenario: Referências preservadas
-
-- **WHEN** uma operação válida é persistida
-- **THEN** carteira, ação e valores informados permanecem associados ao registro retornado
+**Migration**: Clientes que antes enviavam vendas sem saldo suficiente devem registrar compras que cubram a venda ou corrigir a sequência antes de reenviar a operação.

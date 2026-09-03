@@ -21,7 +21,7 @@ public class CarteiraPosicaoService {
         for (Operacao op : operacoes.findByCarteiraIdOrderByDataOperacaoAscIdAsc(carteiraId)) {
             Acumulado a = acumulados.computeIfAbsent(op.getAcao().getId(), id -> new Acumulado(op.getAcao()));
             if (op.getTipo() == TipoOperacao.COMPRA) { a.quantidade = a.quantidade.add(op.getQuantidade()); a.custo = a.custo.add(op.getQuantidade().multiply(op.getPrecoUnitario())); }
-            else { BigDecimal reduzir = a.quantidade.signum() > 0 ? op.getQuantidade().min(a.quantidade) : BigDecimal.ZERO; BigDecimal medio = a.quantidade.signum() > 0 ? a.custo.divide(a.quantidade, 8, java.math.RoundingMode.HALF_UP) : BigDecimal.ZERO; a.quantidade = a.quantidade.subtract(reduzir); a.custo = a.custo.subtract(reduzir.multiply(medio)).max(BigDecimal.ZERO); }
+            else { a.registrarVenda(op.getQuantidade()); }
         }
         return acumulados.values().stream().filter(a -> a.quantidade.signum() > 0).sorted(Comparator.comparing(a -> a.acao.getTicker())).map(Acumulado::toResponse).toList();
     }
@@ -44,6 +44,13 @@ public class CarteiraPosicaoService {
     private static final class Acumulado {
         final Acao acao; BigDecimal quantidade = BigDecimal.ZERO; BigDecimal custo = BigDecimal.ZERO;
         Acumulado(Acao acao) { this.acao = acao; }
+        void registrarVenda(BigDecimal quantidadeVendida) {
+            if (quantidadeVendida.compareTo(quantidade) > 0) throw new IllegalStateException("Operações persistidas violam o saldo não negativo da posição");
+            if (quantidadeVendida.compareTo(quantidade) == 0) { quantidade = BigDecimal.ZERO; custo = BigDecimal.ZERO; return; }
+            BigDecimal precoMedio = custo.divide(quantidade, 8, java.math.RoundingMode.HALF_UP);
+            quantidade = quantidade.subtract(quantidadeVendida);
+            custo = custo.subtract(quantidadeVendida.multiply(precoMedio));
+        }
         PosicaoResponse toResponse() { BigDecimal medio = custo.divide(quantidade, 8, java.math.RoundingMode.HALF_UP); BigDecimal patrimonio = acao.getCotacaoAtual() == null ? null : quantidade.multiply(acao.getCotacaoAtual()); return new PosicaoResponse(acao.getId(), acao.getTicker(), acao.getMercado(), acao.getMoeda(), quantidade, medio, custo, patrimonio, patrimonio == null ? null : patrimonio.subtract(custo)); }
     }
 }
