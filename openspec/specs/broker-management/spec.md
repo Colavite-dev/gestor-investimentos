@@ -18,7 +18,7 @@ O sistema SHALL disponibilizar `POST /corretoras` para cadastrar uma corretora r
 - **THEN** o sistema cadastra a corretora e representa os campos opcionais ausentes como `null`
 
 ### Requirement: CNPJ localmente válido e único
-O sistema SHALL aceitar CNPJ com 14 dígitos ou com a máscara brasileira usual, SHALL validar seus dígitos verificadores e SHALL armazená-lo somente com dígitos. O sistema MUST NOT persistir mais de uma corretora com o mesmo CNPJ normalizado.
+O sistema SHALL aceitar CNPJ com 14 dígitos ou com a máscara brasileira usual, SHALL validar seus dígitos verificadores e SHALL armazená-lo somente com dígitos. O sistema MUST NOT persistir mais de uma corretora com o mesmo CNPJ normalizado. A verificação antecipada de duplicidade SHALL evitar consultas externas quando o cadastro já existir; a garantia final SHALL também abranger solicitações concorrentes que ultrapassem essa verificação antes da persistência.
 
 #### Scenario: CNPJ inválido
 - **WHEN** o cliente informa um CNPJ com formato, quantidade de dígitos ou dígitos verificadores inválidos
@@ -27,6 +27,10 @@ O sistema SHALL aceitar CNPJ com 14 dígitos ou com a máscara brasileira usual,
 #### Scenario: CNPJ duplicado
 - **WHEN** já existe uma corretora com o mesmo CNPJ normalizado
 - **THEN** o sistema responde `409 Conflict` e preserva apenas o cadastro existente
+
+#### Scenario: Colisão concorrente de CNPJ
+- **WHEN** duas solicitações válidas para o mesmo CNPJ normalizado passam pela verificação inicial antes que qualquer uma seja persistida
+- **THEN** o sistema persiste exatamente uma corretora e responde `409 Conflict` para a solicitação que perder a colisão de unicidade
 
 ### Requirement: Validação dos dados de entrada
 O sistema SHALL exigir no cadastro somente um CNPJ não vazio, no formato numérico brasileiro já suportado, e SHALL rejeitar formato, quantidade de dígitos, dígitos verificadores ou propriedades adicionais desconhecidas no corpo. Os dados cadastrais retornados pela fonte externa SHALL ser validados separadamente antes da persistência.

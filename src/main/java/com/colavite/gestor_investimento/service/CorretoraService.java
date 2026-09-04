@@ -18,7 +18,6 @@ import com.colavite.gestor_investimento.mapper.CorretoraMapper;
 import com.colavite.gestor_investimento.repository.CorretoraRepository;
 import com.colavite.gestor_investimento.validation.CnpjUtils;
 import com.colavite.gestor_investimento.validation.CepUtils;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,16 +30,18 @@ public class CorretoraService {
     private final CnpjDataProvider cnpjDataProvider;
     private final CepDataProvider cepDataProvider;
     private final CvmParticipantProvider cvmParticipantProvider;
+    private final CorretoraPersistenceService persistenceService;
 
     public CorretoraService(CorretoraRepository repository, CnpjDataProvider cnpjDataProvider,
-                            CepDataProvider cepDataProvider, CvmParticipantProvider cvmParticipantProvider) {
+                            CepDataProvider cepDataProvider, CvmParticipantProvider cvmParticipantProvider,
+                            CorretoraPersistenceService persistenceService) {
         this.repository = repository;
         this.cnpjDataProvider = cnpjDataProvider;
         this.cepDataProvider = cepDataProvider;
         this.cvmParticipantProvider = cvmParticipantProvider;
+        this.persistenceService = persistenceService;
     }
 
-    @Transactional
     public CorretoraResponse cadastrar(CorretoraRequest request) {
         String cnpj = CnpjUtils.somenteDigitos(request.cnpj());
         if (repository.existsByCnpj(cnpj)) {
@@ -63,11 +64,7 @@ public class CorretoraService {
         Corretora corretora = CorretoraMapper.toEntity(reconciliarEndereco(registrationData, cepData));
         corretora.marcarValidadaNaCvm();
 
-        try {
-            return CorretoraMapper.toResponse(repository.saveAndFlush(corretora));
-        } catch (DataIntegrityViolationException exception) {
-            throw new CnpjDuplicadoException(corretora.getCnpj());
-        }
+        return CorretoraMapper.toResponse(persistenceService.persistir(corretora));
     }
 
     private CnpjRegistrationData reconciliarEndereco(CnpjRegistrationData cnpj, CepAddressData cep) {

@@ -5,6 +5,7 @@ import com.colavite.gestor_investimento.dto.CorretoraResponse;
 import com.colavite.gestor_investimento.entity.Corretora;
 import com.colavite.gestor_investimento.exception.CnpjDuplicadoException;
 import com.colavite.gestor_investimento.exception.CnpjProviderUnavailableException;
+import com.colavite.gestor_investimento.exception.CepProviderUnavailableException;
 import com.colavite.gestor_investimento.exception.CorretoraNotFoundException;
 import com.colavite.gestor_investimento.exception.CvmParticipantNotAcceptedException;
 import com.colavite.gestor_investimento.exception.InvalidCepResponseException;
@@ -20,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 import java.util.Optional;
@@ -49,11 +49,14 @@ class CorretoraServiceTest {
     @Mock
     private CvmParticipantProvider cvmParticipantProvider;
 
+    @Mock
+    private CorretoraPersistenceService persistenceService;
+
     private CorretoraService service;
 
     @BeforeEach
     void setUp() {
-        service = new CorretoraService(repository, cnpjDataProvider, cepDataProvider, cvmParticipantProvider);
+        service = new CorretoraService(repository, cnpjDataProvider, cepDataProvider, cvmParticipantProvider, persistenceService);
         lenient().when(cvmParticipantProvider.consultar("11222333000181"))
                 .thenReturn(Optional.of(new CvmParticipantData("11222333000181", "ATIVO", "CORRETORA DE TITULOS E VALORES MOBILIARIOS")));
     }
@@ -63,7 +66,7 @@ class CorretoraServiceTest {
         when(repository.existsByCnpj("11222333000181")).thenReturn(false);
         when(cnpjDataProvider.consultar("11222333000181")).thenReturn(registrationData("11222333000181"));
         when(cepDataProvider.consultar("01001000")).thenReturn(cepData());
-        when(repository.saveAndFlush(any(Corretora.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(persistenceService.persistir(any(Corretora.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CorretoraResponse response = service.cadastrar(request("11.222.333/0001-81"));
 
@@ -73,7 +76,7 @@ class CorretoraServiceTest {
         assertThat(response.validadaNaCvm()).isTrue();
         assertThat(response.razaoSocial()).isEqualTo("Corretora Oficial S.A.");
         assertThat(response.nomeFantasia()).isEqualTo("Corretora Oficial");
-        verify(repository).saveAndFlush(any(Corretora.class));
+        verify(persistenceService).persistir(any(Corretora.class));
         verify(cnpjDataProvider).consultar("11222333000181");
     }
 
@@ -93,7 +96,7 @@ class CorretoraServiceTest {
         when(repository.existsByCnpj("11222333000181")).thenReturn(false);
         when(cnpjDataProvider.consultar("11222333000181")).thenReturn(registrationData("11222333000181"));
         when(cepDataProvider.consultar("01001000")).thenReturn(cepData());
-        when(repository.saveAndFlush(any(Corretora.class))).thenThrow(new DataIntegrityViolationException("unique"));
+        when(persistenceService.persistir(any(Corretora.class))).thenThrow(new CnpjDuplicadoException("11222333000181"));
 
         assertThatThrownBy(() -> service.cadastrar(request("11222333000181")))
                 .isInstanceOf(CnpjDuplicadoException.class);
@@ -108,7 +111,7 @@ class CorretoraServiceTest {
         assertThatThrownBy(() -> service.cadastrar(request("11222333000181")))
                 .isInstanceOf(CnpjProviderUnavailableException.class);
 
-        verify(repository, never()).saveAndFlush(any(Corretora.class));
+        verify(persistenceService, never()).persistir(any(Corretora.class));
     }
 
     @Test
@@ -119,7 +122,7 @@ class CorretoraServiceTest {
                 "01001-000", null, data.numero(), data.complemento(), null, null, null, data.situacaoCadastral());
         when(cnpjDataProvider.consultar("11222333000181")).thenReturn(data);
         when(cepDataProvider.consultar("01001000")).thenReturn(cepData());
-        when(repository.saveAndFlush(any(Corretora.class))).thenAnswer(i -> i.getArgument(0));
+        when(persistenceService.persistir(any(Corretora.class))).thenAnswer(i -> i.getArgument(0));
 
         CorretoraResponse response = service.cadastrar(request("11222333000181"));
 
@@ -137,7 +140,7 @@ class CorretoraServiceTest {
         when(cepDataProvider.consultar("01001000")).thenReturn(new CepAddressData("01001000", "Outro", "Outro", "Rio", "RJ"));
 
         assertThatThrownBy(() -> service.cadastrar(request("11222333000181"))).isInstanceOf(InvalidCepResponseException.class);
-        verify(repository, never()).saveAndFlush(any(Corretora.class));
+        verify(persistenceService, never()).persistir(any(Corretora.class));
     }
 
     @Test
@@ -153,7 +156,7 @@ class CorretoraServiceTest {
         when(repository.existsByCnpj("11222333000181")).thenReturn(false);
         when(cnpjDataProvider.consultar("11222333000181")).thenReturn(registrationData("11222333000181"));
         when(cepDataProvider.consultar("01001000")).thenReturn(new CepAddressData("01001000", "Outro", "Outro", "São Paulo", "SP"));
-        when(repository.saveAndFlush(any(Corretora.class))).thenAnswer(i -> i.getArgument(0));
+        when(persistenceService.persistir(any(Corretora.class))).thenAnswer(i -> i.getArgument(0));
         CorretoraResponse response = service.cadastrar(request("11222333000181"));
         assertThat(response.logradouro()).isEqualTo("Praça da Sé");
         assertThat(response.bairro()).isEqualTo("Sé");
@@ -176,7 +179,7 @@ class CorretoraServiceTest {
                 .thenReturn(Optional.of(new CvmParticipantData("11222333000181", "ATIVO", "BANCO COMERCIAL")));
         assertThatThrownBy(() -> service.cadastrar(request("11222333000181")))
                 .isInstanceOf(CvmParticipantNotAcceptedException.class);
-        verify(repository, never()).saveAndFlush(any(Corretora.class));
+        verify(persistenceService, never()).persistir(any(Corretora.class));
     }
 
     @Test
@@ -186,9 +189,35 @@ class CorretoraServiceTest {
         when(cepDataProvider.consultar("01001000")).thenReturn(cepData());
         when(cvmParticipantProvider.consultar("11222333000181"))
                 .thenReturn(Optional.of(new CvmParticipantData("11222333000181", "ATIVO", "DISTRIBUIDORA DE TITULOS E VALORES MOBILIARIOS")));
-        when(repository.saveAndFlush(any(Corretora.class))).thenAnswer(i -> i.getArgument(0));
+        when(persistenceService.persistir(any(Corretora.class))).thenAnswer(i -> i.getArgument(0));
 
         assertThat(service.cadastrar(request("11222333000181")).validadaNaCvm()).isTrue();
+    }
+
+    @Test
+    void devePropagarFalhaDeCepSemDelegarPersistencia() {
+        when(repository.existsByCnpj("11222333000181")).thenReturn(false);
+        when(cnpjDataProvider.consultar("11222333000181")).thenReturn(registrationData("11222333000181"));
+        when(cepDataProvider.consultar("01001000")).thenThrow(new CepProviderUnavailableException());
+
+        assertThatThrownBy(() -> service.cadastrar(request("11222333000181")))
+                .isInstanceOf(CepProviderUnavailableException.class);
+
+        verify(persistenceService, never()).persistir(any(Corretora.class));
+        verifyNoInteractions(cvmParticipantProvider);
+    }
+
+    @Test
+    void devePropagarFalhaDaCvmSemDelegarPersistencia() {
+        when(repository.existsByCnpj("11222333000181")).thenReturn(false);
+        when(cnpjDataProvider.consultar("11222333000181")).thenReturn(registrationData("11222333000181"));
+        when(cepDataProvider.consultar("01001000")).thenReturn(cepData());
+        when(cvmParticipantProvider.consultar("11222333000181")).thenThrow(new CvmParticipantNotAcceptedException());
+
+        assertThatThrownBy(() -> service.cadastrar(request("11222333000181")))
+                .isInstanceOf(CvmParticipantNotAcceptedException.class);
+
+        verify(persistenceService, never()).persistir(any(Corretora.class));
     }
 
     @Test
