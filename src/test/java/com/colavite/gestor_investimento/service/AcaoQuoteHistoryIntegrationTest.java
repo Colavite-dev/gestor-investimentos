@@ -39,13 +39,15 @@ class AcaoQuoteHistoryIntegrationTest {
     void cadastroPersisteAcaoEHistoricoInicialComMesmaCotacaoETimestamp() {
         when(selector.para(Mercado.BRASIL)).thenReturn(provider);
         when(provider.consultar("PETR4")).thenReturn(new StockRegistrationData(
-                "PETR4", "Petrobras", Moeda.BRL, new BigDecimal("20.1234"), INICIAL));
+                "PETR4", "Petrobras", Moeda.BRL, new BigDecimal("20.12345678"), INICIAL));
 
         service.cadastrar(new AcaoRequest("PETR4", Mercado.BRASIL));
 
         Acao acao = acoes.findByTickerAndMercado("PETR4", Mercado.BRASIL).orElseThrow();
         var observacao = historico.findByAcaoIdOrderByDataHoraCotacaoAscIdAsc(acao.getId()).get(0);
         assertThat(observacao.getCotacao()).isEqualByComparingTo(acao.getCotacaoAtual());
+        assertThat(acao.getCotacaoAtual()).isEqualByComparingTo("20.12345678");
+        assertThat(observacao.getCotacao()).isEqualByComparingTo("20.12345678");
         assertThat(observacao.getDataHoraCotacao()).isEqualTo(acao.getDataHoraCotacao());
         assertThat(observacao.getDataHoraCotacao()).isEqualTo(INICIAL);
     }

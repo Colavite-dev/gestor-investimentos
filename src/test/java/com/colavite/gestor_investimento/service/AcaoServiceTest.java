@@ -139,6 +139,49 @@ class AcaoServiceTest {
         verify(quoteUpdatePersistenceService, never()).atualizar(any(), any());
     }
 
+    @Test
+    void rejeitaCotacoesExternasForaDaCapacidadeSemDelegarPersistencia() {
+        when(selector.para(Mercado.BRASIL)).thenReturn(brazilProvider);
+        when(brazilProvider.consultar("PETR4")).thenReturn(new StockRegistrationData(
+                "PETR4", "Petrobras", Moeda.BRL, new BigDecimal("20.123456789"), Instant.parse("2026-09-01T12:00:00Z")));
+
+        assertThatThrownBy(() -> service.cadastrar(new AcaoRequest("PETR4", Mercado.BRASIL)))
+                .isInstanceOf(com.colavite.gestor_investimento.exception.InvalidStockDataResponseException.class);
+        verify(quoteUpdatePersistenceService, never()).cadastrar(any(), any());
+
+        Acao acao = new Acao("AAPL", "Apple", Mercado.ESTADOS_UNIDOS, new BigDecimal("200"), Instant.parse("2026-09-01T12:00:00Z"));
+        when(repository.findById(4L)).thenReturn(java.util.Optional.of(acao));
+        when(selector.para(Mercado.ESTADOS_UNIDOS)).thenReturn(usProvider);
+        when(usProvider.consultarCotacao("AAPL")).thenReturn(new StockQuoteData(
+                "AAPL", Moeda.USD, new BigDecimal("100000000000"), Instant.parse("2026-09-02T12:00:00Z")));
+
+        assertThatThrownBy(() -> service.atualizarCotacao(4L))
+                .isInstanceOf(com.colavite.gestor_investimento.exception.InvalidStockDataResponseException.class);
+        verify(quoteUpdatePersistenceService, never()).atualizar(any(), any());
+    }
+
+    @Test
+    void rejeitaCotacoesExternasZeroENegativa() {
+        Acao acao = new Acao("AAPL", "Apple", Mercado.ESTADOS_UNIDOS, new BigDecimal("200"), Instant.parse("2026-09-01T12:00:00Z"));
+        when(repository.findById(5L)).thenReturn(java.util.Optional.of(acao));
+        when(selector.para(Mercado.ESTADOS_UNIDOS)).thenReturn(usProvider);
+        when(usProvider.consultarCotacao("AAPL")).thenReturn(new StockQuoteData(
+                "AAPL", Moeda.USD, BigDecimal.ZERO, Instant.parse("2026-09-02T12:00:00Z")));
+
+        assertThatThrownBy(() -> service.atualizarCotacao(5L))
+                .isInstanceOf(com.colavite.gestor_investimento.exception.InvalidStockDataResponseException.class);
+        verify(quoteUpdatePersistenceService, never()).atualizar(any(), any());
+
+        Acao outraAcao = new Acao("MSFT", "Microsoft", Mercado.ESTADOS_UNIDOS, new BigDecimal("300"), Instant.parse("2026-09-01T12:00:00Z"));
+        when(repository.findById(6L)).thenReturn(java.util.Optional.of(outraAcao));
+        when(usProvider.consultarCotacao("MSFT")).thenReturn(new StockQuoteData(
+                "MSFT", Moeda.USD, new BigDecimal("-0.01"), Instant.parse("2026-09-02T12:00:00Z")));
+
+        assertThatThrownBy(() -> service.atualizarCotacao(6L))
+                .isInstanceOf(com.colavite.gestor_investimento.exception.InvalidStockDataResponseException.class);
+        verify(quoteUpdatePersistenceService, never()).atualizar(any(), any());
+    }
+
     private StockRegistrationData data(String ticker, Moeda moeda) {
         return new StockRegistrationData(ticker, "Empresa", moeda, new BigDecimal("10.50"), Instant.parse("2026-09-01T12:00:00Z"));
     }

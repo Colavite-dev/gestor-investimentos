@@ -11,6 +11,7 @@ import com.colavite.gestor_investimento.integration.stock.StockQuoteData;
 import com.colavite.gestor_investimento.integration.stock.StockRegistrationData;
 import com.colavite.gestor_investimento.repository.AcaoRepository;
 import org.springframework.stereotype.Service;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 
@@ -23,7 +24,7 @@ public class AcaoService {
     public AcaoResponse cadastrar(AcaoRequest request) {
         Mercado mercado = request.mercado();
         StockRegistrationData data = stockDataProviderSelector.para(mercado).consultar(normalizarTicker(request.ticker()));
-        if (data.moeda() != mercado.moeda()) {
+        if (data == null || data.moeda() != mercado.moeda() || !cotacaoRepresentavel(data.cotacaoAtual()) || data.dataHoraCotacao() == null) {
             throw new com.colavite.gestor_investimento.exception.InvalidStockDataResponseException();
         }
         return com.colavite.gestor_investimento.mapper.AcaoMapper.toResponse(quoteUpdatePersistenceService.cadastrar(data, mercado));
@@ -46,9 +47,12 @@ public class AcaoService {
     }
     private void validarCotacao(Acao acao, StockQuoteData quote) {
         if (quote == null || quote.ticker() == null || !acao.getTicker().equals(normalizarTicker(quote.ticker())) || quote.moeda() != acao.getMoeda()
-                || quote.cotacaoAtual() == null || quote.cotacaoAtual().signum() <= 0 || quote.dataHoraCotacao() == null) {
+                || !cotacaoRepresentavel(quote.cotacaoAtual()) || quote.dataHoraCotacao() == null) {
             throw new com.colavite.gestor_investimento.exception.InvalidStockDataResponseException();
         }
+    }
+    private boolean cotacaoRepresentavel(BigDecimal cotacao) {
+        return cotacao != null && cotacao.signum() > 0 && cotacao.scale() <= 8 && cotacao.precision() - cotacao.scale() <= 11;
     }
     public String normalizarTicker(String ticker) { return ticker.trim().toUpperCase(Locale.ROOT); }
 }

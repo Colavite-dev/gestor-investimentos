@@ -35,7 +35,7 @@ public class Acao {
     @Column(nullable = false, length = 3)
     private Moeda moeda;
 
-    @Column(name = "cotacao_atual", nullable = false, precision = 19, scale = 4)
+    @Column(name = "cotacao_atual", nullable = false, precision = 19, scale = 8)
     private BigDecimal cotacaoAtual;
 
     @Column(name = "data_hora_cotacao", nullable = false)
