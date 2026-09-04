@@ -7,6 +7,7 @@ record TwelveDataQuoteResponse(
         String close,
         Long timestamp,
         String status,
-        Integer code
+        Integer code,
+        String message
 ) {
 }

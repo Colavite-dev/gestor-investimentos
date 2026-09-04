@@ -189,6 +189,56 @@ class TwelveDataStockAdapterTest {
         fixture.server.verify();
     }
 
+    @Test
+    void classificaErroDeTickerIgualmenteEmEnvelopeEHttp400() {
+        Fixture envelope = fixture("key");
+        envelope.server.expect(requestTo("http://twelve.test/quote?symbol=AAPL"))
+                .andRespond(withSuccess(error(400, "Invalid symbol"), MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> envelope.adapter.consultarCotacao("AAPL")).isInstanceOf(StockTickerNotFoundException.class);
+        envelope.server.verify();
+
+        Fixture http = fixture("key");
+        http.server.expect(requestTo("http://twelve.test/quote?symbol=AAPL"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON).body(error(400, "Invalid symbol")));
+        assertThatThrownBy(() -> http.adapter.consultarCotacao("AAPL")).isInstanceOf(StockTickerNotFoundException.class);
+        http.server.verify();
+    }
+
+    @Test
+    void rejeitaErro400GenericoComoRespostaExternaInvalida() {
+        Fixture fixture = fixture("key");
+        fixture.server.expect(requestTo("http://twelve.test/quote?symbol=AAPL"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON).body(error(400, "Invalid parameter")));
+
+        assertThatThrownBy(() -> fixture.adapter.consultarCotacao("AAPL"))
+                .isInstanceOf(InvalidStockDataResponseException.class);
+        fixture.server.verify();
+    }
+
+    @Test
+    void rejeitaSimboloAmbiguoSemConsultarQuote() {
+        Fixture fixture = fixture("key");
+        String payload = "{\"data\":["
+                + "{\"symbol\":\"AAPL\",\"instrument_type\":\"Common Stock\",\"country\":\"United States\",\"currency\":\"USD\"},"
+                + "{\"symbol\":\"AAPL\",\"instrument_type\":\"Common Stock\",\"country\":\"United States\",\"currency\":\"USD\"}],\"status\":\"ok\"}";
+        fixture.server.expect(requestTo("http://twelve.test/symbol_search?symbol=AAPL"))
+                .andRespond(withSuccess(payload, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> fixture.adapter.consultar("AAPL"))
+                .isInstanceOf(StockTickerNotFoundException.class);
+        fixture.server.verify();
+    }
+
+    @Test
+    void classificaForbiddenComoIndisponibilidade() {
+        Fixture fixture = fixture("key");
+        fixture.server.expect(requestTo("http://twelve.test/quote?symbol=AAPL"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> fixture.adapter.consultarCotacao("AAPL"))
+                .isInstanceOf(StockProviderUnavailableException.class);
+        fixture.server.verify();
+    }
+
     private void assertInvalidSearch(String searchPayload) {
         Fixture fixture = fixture("key");
         fixture.server.expect(requestTo("http://twelve.test/symbol_search?symbol=AAPL"))
@@ -222,6 +272,10 @@ class TwelveDataStockAdapterTest {
         String timestampValue = timestamp == null ? "null" : timestamp.toString();
         return "{\"symbol\":\"%s\",\"name\":\"%s\",\"currency\":\"%s\",\"close\":\"%s\",\"timestamp\":%s}"
                 .formatted(symbol, name, currency, close, timestampValue);
+    }
+
+    private String error(int code, String message) {
+        return "{\"status\":\"error\",\"code\":%d,\"message\":\"%s\"}".formatted(code, message);
     }
 
     private record Fixture(TwelveDataStockAdapter adapter, MockRestServiceServer server) {

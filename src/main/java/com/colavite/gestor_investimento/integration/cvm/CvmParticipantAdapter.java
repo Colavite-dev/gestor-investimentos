@@ -16,13 +16,12 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.text.Normalizer;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
@@ -115,7 +114,7 @@ public class CvmParticipantAdapter implements CvmParticipantProvider {
             int cnpjColumn = requiredHeader(headers, "CNPJ");
             int statusColumn = requiredHeader(headers, "SIT", "SITUACAO_REGISTRO", "SIT_REGISTRO");
             int categoryColumn = requiredHeader(headers, "TP_PARTIC", "TP_REGISTRO", "CATEGORIA", "CATEGORIA_REGISTRO");
-            Map<String, CvmParticipantData> participants = new HashMap<>();
+            Map<String, List<CvmParticipantData>> participants = new HashMap<>();
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.isBlank()) continue;
@@ -128,9 +127,10 @@ public class CvmParticipantAdapter implements CvmParticipantProvider {
                 }
                 String normalizedCnpj = CnpjUtils.somenteDigitos(cnpj);
                 if (normalizedCnpj.length() != 14) throw new InvalidCvmResponseException();
-                participants.put(normalizedCnpj, new CvmParticipantData(normalizedCnpj, status.trim(), category.trim()));
+                participants.computeIfAbsent(normalizedCnpj, ignored -> new ArrayList<>())
+                        .add(new CvmParticipantData(normalizedCnpj, status.trim(), category.trim()));
             }
-            return Map.copyOf(participants);
+            return selectRepresentatives(participants);
         }
     }
 
@@ -151,7 +151,7 @@ public class CvmParticipantAdapter implements CvmParticipantProvider {
     }
 
     private String normalizeHeader(String value) {
-        return normalize(value).replace(' ', '_');
+        return CvmParticipantEligibility.normalize(value).replace(' ', '_');
     }
 
     private String valueAt(List<String> values, int index) {
@@ -183,11 +183,15 @@ public class CvmParticipantAdapter implements CvmParticipantProvider {
         return values;
     }
 
-    private String normalize(String value) {
-        return Normalizer.normalize(value == null ? "" : value, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .trim()
-                .toUpperCase(Locale.ROOT);
+    private Map<String, CvmParticipantData> selectRepresentatives(Map<String, List<CvmParticipantData>> grouped) {
+        Map<String, CvmParticipantData> representatives = new HashMap<>();
+        Comparator<CvmParticipantData> stableOrder = Comparator
+                .comparing((CvmParticipantData participant) -> !CvmParticipantEligibility.isEligible(participant))
+                .thenComparing(participant -> CvmParticipantEligibility.normalize(participant.situacaoRegistro()))
+                .thenComparing(participant -> CvmParticipantEligibility.normalize(participant.categoria()));
+        grouped.forEach((cnpj, records) -> representatives.put(cnpj, records.stream().min(stableOrder)
+                .orElseThrow(InvalidCvmResponseException::new)));
+        return Map.copyOf(representatives);
     }
 
     private record Snapshot(Map<String, CvmParticipantData> participants, Instant loadedAt) {

@@ -66,4 +66,17 @@ class GlobalExceptionHandlerTest {
         assertThat(invalid.getBody().message()).doesNotContain("zip remoto");
         assertThat(unavailable.getBody().message()).doesNotContain("host remoto");
     }
+
+    @Test
+    void deveRepresentarErrosDeAcoesSemDetalhesExternos() {
+        ResponseEntity<ApiErrorResponse> invalid = handler.handleInvalidStockData(
+                new InvalidStockDataResponseException(new RuntimeException("apikey secret https://provider.test?token=abc")), request);
+        ResponseEntity<ApiErrorResponse> unavailable = handler.handleStockUnavailable(
+                new StockProviderUnavailableException(new RuntimeException("apikey secret https://provider.test?token=abc")), request);
+
+        assertThat(invalid.getStatusCode().value()).isEqualTo(502);
+        assertThat(unavailable.getStatusCode().value()).isEqualTo(503);
+        assertThat(invalid.getBody().message()).doesNotContain("apikey", "token", "provider.test");
+        assertThat(unavailable.getBody().message()).doesNotContain("apikey", "token", "provider.test");
+    }
 }

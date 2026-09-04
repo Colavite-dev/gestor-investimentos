@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.ResourceAccessException;
@@ -20,9 +21,14 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
+import java.io.IOException;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class TwelveDataStockAdapter implements StockDataProvider {
@@ -30,6 +36,12 @@ public class TwelveDataStockAdapter implements StockDataProvider {
     private static final String UNITED_STATES = "United States";
     private static final String COMMON_STOCK = "Common Stock";
     private static final String USD = "USD";
+    private static final Set<String> KNOWN_TICKER_ERROR_MESSAGES = Set.of(
+            "INVALID SYMBOL", "SYMBOL NOT FOUND", "SYMBOL IS MISSING", "THE SYMBOL IS MISSING",
+            "REQUESTED SYMBOL IS INVALID", "INVALID OR UNSUPPORTED SYMBOL");
+    private static final Pattern STATUS_FIELD = Pattern.compile("\\\"status\\\"\\s*:\\s*\\\"([^\\\"]*)\\\"");
+    private static final Pattern CODE_FIELD = Pattern.compile("\\\"code\\\"\\s*:\\s*(\\d+)");
+    private static final Pattern MESSAGE_FIELD = Pattern.compile("\\\"message\\\"\\s*:\\s*\\\"([^\\\"]*)\\\"");
 
     private final RestClient restClient;
     private final String apiKey;
@@ -95,19 +107,20 @@ public class TwelveDataStockAdapter implements StockDataProvider {
                 .uri(uri -> uri.path("/symbol_search").queryParam("symbol", ticker).build())
                 .header(HttpHeaders.AUTHORIZATION, authorization())
                 .retrieve()
-                .onStatus(HttpStatusCode::isError, (request, external) -> throwForStatus(external.getStatusCode()))
+                .onStatus(HttpStatusCode::isError, (request, external) -> throwForHttpError(external))
                 .body(TwelveDataSymbolSearchResponse.class);
 
-        throwForStructuredError(response == null ? null : response.status(), response == null ? null : response.code());
+        throwForStructuredError(response == null ? null : response.status(), response == null ? null : response.code(), response == null ? null : response.message());
         if (response == null || response.data() == null) {
             throw new InvalidStockDataResponseException();
         }
         String normalizedTicker = normalize(ticker);
-        return response.data().stream()
+        List<TwelveDataSymbolSearchResponse.Result> matches = response.data().stream()
                 .filter(result -> result != null && normalizedTicker.equals(normalize(result.symbol())))
                 .filter(this::isEligible)
-                .findFirst()
-                .orElseThrow(StockTickerNotFoundException::new);
+                .toList();
+        if (matches.size() != 1) throw new StockTickerNotFoundException();
+        return matches.get(0);
     }
 
     private TwelveDataQuoteResponse quote(String ticker) {
@@ -115,9 +128,9 @@ public class TwelveDataStockAdapter implements StockDataProvider {
                 .uri(uri -> uri.path("/quote").queryParam("symbol", ticker).build())
                 .header(HttpHeaders.AUTHORIZATION, authorization())
                 .retrieve()
-                .onStatus(HttpStatusCode::isError, (request, external) -> throwForStatus(external.getStatusCode()))
+                .onStatus(HttpStatusCode::isError, (request, external) -> throwForHttpError(external))
                 .body(TwelveDataQuoteResponse.class);
-        throwForStructuredError(response == null ? null : response.status(), response == null ? null : response.code());
+        throwForStructuredError(response == null ? null : response.status(), response == null ? null : response.code(), response == null ? null : response.message());
         return response;
     }
 
@@ -159,22 +172,55 @@ public class TwelveDataStockAdapter implements StockDataProvider {
                 && USD.equals(result.currency());
     }
 
-    private void throwForStatus(HttpStatusCode statusCode) {
-        int status = statusCode.value();
+    private void throwForHttpError(ClientHttpResponse response) throws IOException {
+        int status = response.getStatusCode().value();
+        if (status == 401 || status == 403 || status == 429 || status >= 500) {
+            throw new StockProviderUnavailableException();
+        }
         if (status == 404) {
             throw new StockTickerNotFoundException();
         }
-        throw new StockProviderUnavailableException();
+        if (status == 400) {
+            try {
+                TwelveDataErrorResponse error = parseError(response);
+                throwForStructuredError(error.status(), error.code(), error.message());
+            } catch (IOException exception) {
+                throw new InvalidStockDataResponseException(exception);
+            }
+        }
+        throw new InvalidStockDataResponseException();
     }
 
-    private void throwForStructuredError(String status, Integer code) {
+    private void throwForStructuredError(String status, Integer code, String message) {
         if (!"error".equalsIgnoreCase(status)) {
             return;
         }
-        if (code != null && (code == 400 || code == 404)) {
+        if (isKnownTickerError(code, message)) {
             throw new StockTickerNotFoundException();
         }
-        throw new StockProviderUnavailableException();
+        if (code != null && (code == 401 || code == 403 || code == 429 || code >= 500)) {
+            throw new StockProviderUnavailableException();
+        }
+        throw new InvalidStockDataResponseException();
+    }
+
+    private boolean isKnownTickerError(Integer code, String message) {
+        return code != null && (code == 404 || (code == 400 && KNOWN_TICKER_ERROR_MESSAGES.contains(normalize(message))));
+    }
+
+    private TwelveDataErrorResponse parseError(ClientHttpResponse response) throws IOException {
+        String body = new String(response.getBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        return new TwelveDataErrorResponse(stringField(STATUS_FIELD, body), integerField(body), stringField(MESSAGE_FIELD, body));
+    }
+
+    private String stringField(Pattern pattern, String body) {
+        Matcher matcher = pattern.matcher(body);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    private Integer integerField(String body) {
+        Matcher matcher = CODE_FIELD.matcher(body);
+        return matcher.find() ? Integer.valueOf(matcher.group(1)) : null;
     }
 
     private String authorization() {

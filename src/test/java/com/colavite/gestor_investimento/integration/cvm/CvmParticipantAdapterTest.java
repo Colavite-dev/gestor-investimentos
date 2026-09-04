@@ -92,6 +92,33 @@ class CvmParticipantAdapterTest {
     }
 
     @Test
+    void decideRegistrosRepetidosIndependentementeDaOrdemDoCsv() throws Exception {
+        String invalidThenValid = "CNPJ;SIT;TP_REGISTRO\n11222333000181;INATIVO;BANCO\n11222333000181;ATIVO;CORRETORA\n";
+        String validThenInvalid = "CNPJ;SIT;TP_REGISTRO\n11222333000181;ATIVO;CORRETORA\n11222333000181;INATIVO;BANCO\n";
+
+        CvmParticipantAdapter first = adapter(new MutableClock());
+        server.expect(requestTo("http://cvm.test/cad_intermed.zip")).andRespond(withSuccess(zip(invalidThenValid, false), MediaType.APPLICATION_OCTET_STREAM));
+        Optional<CvmParticipantData> firstResult = first.consultar("11222333000181");
+        server.verify();
+
+        CvmParticipantAdapter second = adapter(new MutableClock());
+        server.expect(requestTo("http://cvm.test/cad_intermed.zip")).andRespond(withSuccess(zip(validThenInvalid, false), MediaType.APPLICATION_OCTET_STREAM));
+        Optional<CvmParticipantData> secondResult = second.consultar("11222333000181");
+
+        assertThat(firstResult).isEqualTo(secondResult);
+        assertThat(firstResult).contains(new CvmParticipantData("11222333000181", "ATIVO", "CORRETORA"));
+    }
+
+    @Test
+    void mantemRepresentanteDeterministicoQuandoNenhumRegistroEhElegivel() throws Exception {
+        CvmParticipantAdapter adapter = adapter(new MutableClock());
+        server.expect(requestTo("http://cvm.test/cad_intermed.zip")).andRespond(withSuccess(zip("CNPJ;SIT;TP_REGISTRO\n11222333000181;INATIVO;BANCO\n11222333000181;ATIVO;CUSTODIANTE\n", false), MediaType.APPLICATION_OCTET_STREAM));
+
+        assertThat(adapter.consultar("11222333000181"))
+                .contains(new CvmParticipantData("11222333000181", "ATIVO", "CUSTODIANTE"));
+    }
+
+    @Test
     void classificaConexaoETimeoutComoIndisponibilidade() throws Exception {
         int closedPort;
         try (ServerSocket socket = new ServerSocket(0)) {

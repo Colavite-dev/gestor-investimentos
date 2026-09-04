@@ -12,6 +12,7 @@ import com.colavite.gestor_investimento.integration.cep.CepDataProvider;
 import com.colavite.gestor_investimento.integration.cnpj.CnpjDataProvider;
 import com.colavite.gestor_investimento.integration.cnpj.CnpjRegistrationData;
 import com.colavite.gestor_investimento.integration.cvm.CvmParticipantData;
+import com.colavite.gestor_investimento.integration.cvm.CvmParticipantEligibility;
 import com.colavite.gestor_investimento.integration.cvm.CvmParticipantProvider;
 import com.colavite.gestor_investimento.mapper.CorretoraMapper;
 import com.colavite.gestor_investimento.repository.CorretoraRepository;
@@ -22,8 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.text.Normalizer;
-import java.util.Locale;
 
 @Service
 public class CorretoraService {
@@ -92,15 +91,7 @@ public class CorretoraService {
     }
 
     private boolean isAcceptedByCvm(CvmParticipantData participant) {
-        return "ATIVO".equals(normalize(participant.situacaoRegistro()))
-                && (normalize(participant.categoria()).contains("CORRETORA")
-                || normalize(participant.categoria()).contains("DISTRIBUIDORA"));
-    }
-
-    private String normalize(String value) {
-        return Normalizer.normalize(value == null ? "" : value, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .toUpperCase(Locale.ROOT);
+        return CvmParticipantEligibility.isEligible(participant);
     }
 
     @Transactional(readOnly = true)
