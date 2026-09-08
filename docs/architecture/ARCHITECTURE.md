@@ -1,136 +1,30 @@
 # Arquitetura do Sistema
 
-## Visão Geral
+## Visão geral
 
-O sistema utilizará Java e Spring Boot seguindo arquitetura em camadas.
+O backend Spring Boot segue arquitetura em camadas:
 
-Fluxo principal:
+```text
+Controller → Service → Repository → PostgreSQL
+Service → Port/Provider → Adapter → API externa
+```
 
-Controller
-→ Service
-→ Repository
-→ PostgreSQL
+Controllers recebem e validam DTOs, services aplicam regras e orquestram fluxos, repositories persistem entidades JPA e adapters convertem contratos externos em modelos internos. Entidades não são contratos HTTP.
 
-Integrações externas deverão utilizar abstrações adicionais:
+## Domínios atuais
 
-Service
-→ Port/Provider
-→ Adapter
-→ API externa
+- **Corretoras:** BrasilAPI, ViaCEP e CVM são consultadas antes da persistência transacional curta em `CorretoraPersistenceService`.
+- **Ações e cotações:** brapi e Twelve Data são isoladas por providers/adapters; cadastro/atualização e histórico de cotação persistem atomicamente por `AcaoQuoteUpdatePersistenceService`.
+- **Carteiras e operações:** operações relacionam Carteira e Acao; o serviço de posições calcula quantidade líquida, preço médio e resumo sem ocultar operações inválidas.
 
-## Camadas
+## Transações e persistência
 
-### Controller
-
-Responsável por:
-
-- receber requisições HTTP;
-- validar DTOs;
-- encaminhar chamadas para services;
-- retornar respostas HTTP.
-
-Não deve conter regra de negócio.
-
-### Service
-
-Responsável por:
-
-- regras de negócio;
-- orquestração de operações;
-- comunicação com repositories;
-- comunicação com abstrações de integrações externas.
-
-### Repository
-
-Responsável pela persistência através de Spring Data JPA.
-
-### Entity
-
-Representa os dados persistidos.
-
-### DTO
-
-Representa entrada e saída da API.
-
-Entidades JPA não devem ser usadas diretamente como contrato HTTP.
+PostgreSQL é o banco principal. Flyway controla V1–V6 e Hibernate usa `ddl-auto=validate`. Chamadas HTTP externas não ficam dentro de transações de escrita. A unicidade de CNPJ e `(ticker, mercado)` é protegida no banco; a regra de não permitir venda a descoberto é validada antes de persistir e também considera operações retroativas.
 
 ## Integrações externas
 
-APIs externas deverão ser isoladas.
-
-Exemplo:
-
-CotacaoService
-→ CotacaoProvider
-→ BrapiAdapter
-
-ou:
-
-CotacaoService
-→ CotacaoProvider
-→ AlphaVantageAdapter
-
-O domínio não deve depender diretamente do formato das respostas externas.
-
-Adapters deverão converter respostas externas para modelos internos.
-
-## Pacotes iniciais
-
-Estrutura candidata:
-
-com.<projeto>.gestorinvestimento
-
-controller
-service
-repository
-entity
-dto
-exception
-integration
-config
-mapper
-
-Dentro de integration:
-
-integration/
-cnpj/
-cep/
-financialinstitution/
-quote/
-
-A estrutura poderá evoluir conforme surgirem necessidades concretas.
-
-## Persistência
-
-Banco principal:
-
-PostgreSQL.
-
-Controle de schema:
-
-Flyway.
-
-Hibernate/JPA não deverá ser utilizado como mecanismo oficial de criação automática do schema em produção.
-
-## Configuração
-
-Informações sensíveis ou dependentes do ambiente não devem ficar diretamente no código.
-
-Exemplos:
-
-- senha do banco;
-- API keys;
-- tokens;
-- URLs configuráveis.
-
-Essas informações deverão ser recebidas através de configuração externa e variáveis de ambiente.
+Os providers reais são BrasilAPI (CNPJ), ViaCEP (CEP), CVM (participantes intermediários), brapi (ações BR) e Twelve Data (ações EUA). Detalhes operacionais estão em [Integrações externas](../integrations/external-apis.md).
 
 ## Testes
 
-O projeto deverá priorizar:
-
-- testes unitários para regras de negócio;
-- testes de integração para persistência e endpoints relevantes;
-- mocks/fakes para dependências externas quando apropriado.
-
-Chamadas reais a APIs externas não devem tornar toda a suíte de testes dependente da disponibilidade dos terceiros.
+Testes normais usam H2 em memória, Flyway e mocks/doubles para integrações. O teste PostgreSQL e os testes reais de providers são opt-in; o fluxo normal não depende de Docker ou internet.

@@ -1,6 +1,6 @@
-# Modelo simplificado de entidades
+# Modelo persistido de entidades
 
-O diagrama representa o modelo persistente atual. `Acao` é um cadastro mestre identificado logicamente por `(ticker, mercado)`; não há relacionamento obrigatório com `Corretora`.
+O diagrama representa as tabelas e relacionamentos atuais. `Corretora` não possui associação persistida com `Acao`.
 
 ```mermaid
 erDiagram
@@ -9,30 +9,53 @@ erDiagram
         VARCHAR cnpj UK
         VARCHAR razao_social
         VARCHAR nome_fantasia
-        VARCHAR email
-        VARCHAR telefone
         VARCHAR cep
-        VARCHAR logradouro
-        VARCHAR numero
-        VARCHAR complemento
-        VARCHAR bairro
         VARCHAR cidade
         CHAR uf
-        VARCHAR situacao_cadastral
         BOOLEAN validada_na_cvm
-        TIMESTAMP data_cadastro
+        TIMESTAMPTZ data_cadastro
     }
 
     ACAO {
         BIGINT id PK
         VARCHAR ticker
         VARCHAR nome_empresa
-        ENUM mercado "BRASIL | ESTADOS_UNIDOS"
-        ENUM moeda "BRL | USD"
+        VARCHAR mercado
+        VARCHAR moeda
         DECIMAL cotacao_atual
-        TIMESTAMP data_hora_cotacao
-        UNIQUE ticker_mercado "ticker + mercado"
+        TIMESTAMPTZ data_hora_cotacao
+        UNIQUE ticker_mercado
     }
+
+    CARTEIRA {
+        BIGINT id PK
+        VARCHAR nome
+        VARCHAR nome_normalizado UK
+        VARCHAR descricao
+        TIMESTAMPTZ data_cadastro
+    }
+
+    OPERACAO {
+        BIGINT id PK
+        BIGINT carteira_id FK
+        BIGINT acao_id FK
+        VARCHAR tipo
+        DECIMAL quantidade
+        DECIMAL preco_unitario
+        TIMESTAMPTZ data_operacao
+    }
+
+    COTACAO_HISTORICA {
+        BIGINT id PK
+        BIGINT acao_id FK
+        DECIMAL cotacao
+        TIMESTAMPTZ data_hora_cotacao
+        TIMESTAMPTZ data_registro
+    }
+
+    CARTEIRA ||--o{ OPERACAO : registra
+    ACAO ||--o{ OPERACAO : referencia
+    ACAO ||--o{ COTACAO_HISTORICA : possui
 ```
 
-`CORRETORA` e `ACAO` não possuem aresta no diagrama porque o modelo atual não persiste associação entre elas.
+`OPERACAO` é obrigatoriamente ligada a uma `CARTEIRA` e uma `ACAO`. `COTACAO_HISTORICA` é obrigatoriamente ligada a uma `ACAO`. As cotações, quantidades e preços monetários usam precisão `NUMERIC(19,8)` no schema atual.
