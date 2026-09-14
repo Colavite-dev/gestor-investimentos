@@ -4,6 +4,16 @@ O diagrama representa as tabelas e relacionamentos atuais. `Corretora` não poss
 
 ```mermaid
 erDiagram
+    USUARIO {
+        BIGINT id PK
+        VARCHAR nome
+        VARCHAR username UK
+        VARCHAR email UK
+        VARCHAR password_hash
+        VARCHAR role
+        TIMESTAMPTZ created_at
+    }
+
     CORRETORA {
         BIGINT id PK
         VARCHAR cnpj UK
@@ -29,10 +39,12 @@ erDiagram
 
     CARTEIRA {
         BIGINT id PK
+        BIGINT usuario_id FK
         VARCHAR nome
-        VARCHAR nome_normalizado UK
+        VARCHAR nome_normalizado
         VARCHAR descricao
         TIMESTAMPTZ data_cadastro
+        UNIQUE usuario_nome_normalizado
     }
 
     OPERACAO {
@@ -53,9 +65,12 @@ erDiagram
         TIMESTAMPTZ data_registro
     }
 
+    USUARIO ||--o{ CARTEIRA : possui
     CARTEIRA ||--o{ OPERACAO : registra
     ACAO ||--o{ OPERACAO : referencia
     ACAO ||--o{ COTACAO_HISTORICA : possui
 ```
 
-`OPERACAO` é obrigatoriamente ligada a uma `CARTEIRA` e uma `ACAO`. `COTACAO_HISTORICA` é obrigatoriamente ligada a uma `ACAO`. As cotações, quantidades e preços monetários usam precisão `NUMERIC(19,8)` no schema atual.
+`CARTEIRA.usuario_id` é obrigatório. Seu nome normalizado é único somente dentro do mesmo usuário, conforme V8. `OPERACAO` referencia obrigatoriamente uma carteira e uma ação; `COTACAO_HISTORICA` referencia obrigatoriamente uma ação.
+
+`ACAO` é global e sua identidade persistida é `(ticker, mercado)`. Cotações, quantidades e preços monetários usam `NUMERIC(19,8)` no schema atual.

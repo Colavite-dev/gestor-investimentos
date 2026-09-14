@@ -5,8 +5,14 @@ import com.colavite.gestor_investimento.entity.Acao;
 import com.colavite.gestor_investimento.entity.Mercado;
 import com.colavite.gestor_investimento.entity.Moeda;
 import com.colavite.gestor_investimento.exception.AcaoDuplicadaException;
+import com.colavite.gestor_investimento.exception.AcaoResolutionRaceException;
+import com.colavite.gestor_investimento.exception.StockProviderUnavailableException;
 import com.colavite.gestor_investimento.integration.stock.StockDataProvider;
 import com.colavite.gestor_investimento.integration.stock.StockDataProviderSelector;
+import com.colavite.gestor_investimento.integration.stock.StockCatalogProvider;
+import com.colavite.gestor_investimento.integration.stock.StockCatalogProviderSelector;
+import com.colavite.gestor_investimento.integration.stock.StockCatalogItemData;
+import com.colavite.gestor_investimento.integration.stock.StockCatalogPageData;
 import com.colavite.gestor_investimento.integration.stock.StockQuoteData;
 import com.colavite.gestor_investimento.integration.stock.StockRegistrationData;
 import com.colavite.gestor_investimento.repository.AcaoRepository;
@@ -24,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.eq;
 
@@ -32,6 +39,8 @@ class AcaoServiceTest {
 
     @Mock AcaoRepository repository;
     @Mock StockDataProviderSelector selector;
+    @Mock StockCatalogProviderSelector catalogSelector;
+    @Mock StockCatalogProvider catalogProvider;
     @Mock StockDataProvider brazilProvider;
     @Mock StockDataProvider usProvider;
     @Mock AcaoQuoteUpdatePersistenceService quoteUpdatePersistenceService;
@@ -39,7 +48,39 @@ class AcaoServiceTest {
 
     @BeforeEach
     void setup() {
-        service = new AcaoService(repository, selector, quoteUpdatePersistenceService);
+        service = new AcaoService(repository, selector, catalogSelector, quoteUpdatePersistenceService);
+    }
+
+    @Test
+    void catalogoMapeiaDadosSemPersistirERemoveLogoAmericano() {
+        when(catalogSelector.para(Mercado.ESTADOS_UNIDOS)).thenReturn(catalogProvider);
+        when(catalogProvider.catalogar("app", 0, 20)).thenReturn(new StockCatalogPageData(java.util.List.of(
+                new StockCatalogItemData("aapl", "Apple", Mercado.ESTADOS_UNIDOS, Moeda.USD,
+                        "NASDAQ", "XNAS", null, "https://nao-deve-sair.example/aapl.svg")
+        ), 0, 20, false, 1L));
+
+        var response = service.catalogar(Mercado.ESTADOS_UNIDOS, " app ", 0, 20);
+
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.items().get(0).ticker()).isEqualTo("AAPL");
+        assertThat(response.items().get(0).logoUrl()).isNull();
+        assertThat(response.totalElements()).isEqualTo(1L);
+        verifyNoInteractions(repository, quoteUpdatePersistenceService);
+    }
+
+    @Test
+    void catalogoBrasileiroRejeitaLogoInseguroMesmoNaFronteiraDoPort() {
+        when(catalogSelector.para(Mercado.BRASIL)).thenReturn(catalogProvider);
+        when(catalogProvider.catalogar("PETR", 0, 20)).thenReturn(new StockCatalogPageData(java.util.List.of(
+                new StockCatalogItemData("PETR4", "Petrobras", Mercado.BRASIL, Moeda.BRL,
+                        "B3", null, new BigDecimal("32.47"), "http://inseguro.example/PETR4.svg")
+        ), 0, 20, false, 1L));
+
+        var response = service.catalogar(Mercado.BRASIL, "PETR", 0, 20);
+
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.items().get(0).logoUrl()).isNull();
+        verifyNoInteractions(repository, quoteUpdatePersistenceService);
     }
 
     @Test
@@ -72,6 +113,105 @@ class AcaoServiceTest {
         verify(usProvider).consultar("AAPL");
         verify(quoteUpdatePersistenceService).cadastrar(any(), eq(Mercado.ESTADOS_UNIDOS));
         verify(brazilProvider, never()).consultar(any());
+    }
+
+    @Test
+    void pesquisaAgregaProvidersOrdenaEDeduplicaSemPersistir() {
+        when(selector.para(Mercado.BRASIL)).thenReturn(brazilProvider);
+        when(selector.para(Mercado.ESTADOS_UNIDOS)).thenReturn(usProvider);
+        when(brazilProvider.pesquisar("PET")).thenReturn(java.util.List.of(
+                new com.colavite.gestor_investimento.integration.stock.StockSuggestionData("PETR4", "Petrobras", Mercado.BRASIL, Moeda.BRL),
+                new com.colavite.gestor_investimento.integration.stock.StockSuggestionData("PETR4", "Petrobras", Mercado.BRASIL, Moeda.BRL)));
+        when(usProvider.pesquisar("PET")).thenReturn(java.util.List.of(
+                new com.colavite.gestor_investimento.integration.stock.StockSuggestionData("PET", "Pet Corp", Mercado.ESTADOS_UNIDOS, Moeda.USD)));
+
+        var result = service.pesquisar(" pet ");
+
+        assertThat(result).extracting(r -> r.ticker()).containsExactly("PET", "PETR4");
+        assertThat(result).extracting(r -> r.mercado()).containsExactly(Mercado.ESTADOS_UNIDOS, Mercado.BRASIL);
+        verify(quoteUpdatePersistenceService, never()).cadastrar(any(), any());
+        verify(quoteUpdatePersistenceService, never()).resolver(any(), any());
+    }
+
+    @Test
+    void pesquisaToleraProviderIndisponivelQuandoOutroResponde() {
+        when(selector.para(Mercado.BRASIL)).thenReturn(brazilProvider);
+        when(selector.para(Mercado.ESTADOS_UNIDOS)).thenReturn(usProvider);
+        when(brazilProvider.pesquisar("AA")).thenThrow(new StockProviderUnavailableException());
+        when(usProvider.pesquisar("AA")).thenReturn(java.util.List.of(
+                new com.colavite.gestor_investimento.integration.stock.StockSuggestionData("AAPL", "Apple", Mercado.ESTADOS_UNIDOS, Moeda.USD)));
+
+        assertThat(service.pesquisar("  aa  ")).extracting(r -> r.ticker()).containsExactly("AAPL");
+        verify(brazilProvider).pesquisar("AA");
+        verify(usProvider).pesquisar("AA");
+    }
+
+    @Test
+    void pesquisaToleraProviderAmericanoIndisponivelQuandoBrasilResponde() {
+        when(selector.para(Mercado.BRASIL)).thenReturn(brazilProvider);
+        when(selector.para(Mercado.ESTADOS_UNIDOS)).thenReturn(usProvider);
+        when(usProvider.pesquisar("PET")).thenThrow(new StockProviderUnavailableException());
+        when(brazilProvider.pesquisar("PET")).thenReturn(java.util.List.of(
+                new com.colavite.gestor_investimento.integration.stock.StockSuggestionData("PETR4", "Petrobras", Mercado.BRASIL, Moeda.BRL)));
+
+        assertThat(service.pesquisar("pet")).extracting(r -> r.ticker()).containsExactly("PETR4");
+        verify(usProvider).pesquisar("PET");
+        verify(brazilProvider).pesquisar("PET");
+    }
+
+    @Test
+    void resolveExistenteNaoConsultaProviderNemCriaHistorico() {
+        Acao existing = acao("AAPL", Mercado.ESTADOS_UNIDOS);
+        when(repository.findByTickerAndMercado("AAPL", Mercado.ESTADOS_UNIDOS)).thenReturn(java.util.Optional.of(existing));
+
+        var result = service.resolver(new com.colavite.gestor_investimento.dto.AcaoResolveRequest(" aapl ", Mercado.ESTADOS_UNIDOS));
+
+        assertThat(result.ticker()).isEqualTo("AAPL");
+        verifyNoInteractions(usProvider, brazilProvider, quoteUpdatePersistenceService);
+    }
+
+    @Test
+    void resolveNovoUsaSomenteProviderDoMercado() {
+        when(repository.findByTickerAndMercado("PETR4", Mercado.BRASIL)).thenReturn(java.util.Optional.empty());
+        when(selector.para(Mercado.BRASIL)).thenReturn(brazilProvider);
+        when(brazilProvider.consultar("PETR4")).thenReturn(data("PETR4", Moeda.BRL));
+        when(quoteUpdatePersistenceService.resolver(any(), eq(Mercado.BRASIL))).thenReturn(acao("PETR4", Mercado.BRASIL));
+
+        var result = service.resolver(new com.colavite.gestor_investimento.dto.AcaoResolveRequest(" petr4 ", Mercado.BRASIL));
+
+        assertThat(result.ticker()).isEqualTo("PETR4");
+        verify(brazilProvider).consultar("PETR4");
+        verifyNoInteractions(usProvider);
+    }
+
+    @Test
+    void resolveNovoAmericanoUsaSomenteProviderDoMercado() {
+        when(repository.findByTickerAndMercado("AAPL", Mercado.ESTADOS_UNIDOS)).thenReturn(java.util.Optional.empty());
+        when(selector.para(Mercado.ESTADOS_UNIDOS)).thenReturn(usProvider);
+        when(usProvider.consultar("AAPL")).thenReturn(data("AAPL", Moeda.USD));
+        when(quoteUpdatePersistenceService.resolver(any(), eq(Mercado.ESTADOS_UNIDOS)))
+                .thenReturn(acao("AAPL", Mercado.ESTADOS_UNIDOS));
+
+        var result = service.resolver(new com.colavite.gestor_investimento.dto.AcaoResolveRequest(" aapl ", Mercado.ESTADOS_UNIDOS));
+
+        assertThat(result.ticker()).isEqualTo("AAPL");
+        assertThat(result.moeda()).isEqualTo(Moeda.USD);
+        verify(usProvider).consultar("AAPL");
+        verifyNoInteractions(brazilProvider);
+    }
+
+    @Test
+    void resolveConcorrenteRelereAcaoPersistida() {
+        Acao existing = acao("AAPL", Mercado.ESTADOS_UNIDOS);
+        when(repository.findByTickerAndMercado("AAPL", Mercado.ESTADOS_UNIDOS))
+                .thenReturn(java.util.Optional.empty(), java.util.Optional.of(existing));
+        when(selector.para(Mercado.ESTADOS_UNIDOS)).thenReturn(usProvider);
+        when(usProvider.consultar("AAPL")).thenReturn(data("AAPL", Moeda.USD));
+        when(quoteUpdatePersistenceService.resolver(any(), eq(Mercado.ESTADOS_UNIDOS)))
+                .thenThrow(new AcaoResolutionRaceException(new RuntimeException("unique")));
+
+        assertThat(service.resolver(new com.colavite.gestor_investimento.dto.AcaoResolveRequest("AAPL", Mercado.ESTADOS_UNIDOS)).ticker())
+                .isEqualTo("AAPL");
     }
 
     @Test

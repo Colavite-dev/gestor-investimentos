@@ -8,10 +8,11 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 public interface CarteiraRepository extends JpaRepository<Carteira, Long> {
-    boolean existsByNomeNormalizado(String nomeNormalizado);
-    List<Carteira> findAllByOrderByIdAsc();
+    boolean existsByUsuarioIdAndNomeNormalizado(Long usuarioId, String nomeNormalizado);
+    List<Carteira> findAllByUsuarioIdOrderByIdAsc(Long usuarioId);
+    Optional<Carteira> findByIdAndUsuarioId(Long id, Long usuarioId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select carteira from Carteira carteira where carteira.id = :id")
-    Optional<Carteira> findByIdForUpdate(@Param("id") Long id);
+    @Query("select carteira from Carteira carteira where carteira.id = :id and carteira.usuario.id = :usuarioId")
+    Optional<Carteira> findByIdAndUsuarioIdForUpdate(@Param("id") Long id, @Param("usuarioId") Long usuarioId);
 }

@@ -4,6 +4,7 @@ import com.colavite.gestor_investimento.dto.OperacaoRequest;
 import com.colavite.gestor_investimento.entity.*;
 import com.colavite.gestor_investimento.exception.SaldoInsuficienteParaVendaException;
 import com.colavite.gestor_investimento.repository.*;
+import com.colavite.gestor_investimento.support.TestUsuarios;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,13 +33,14 @@ class OperacaoServiceTest {
     private Carteira carteira;
     private Acao acao;
     private OperacaoService service;
+    private static final Long USUARIO_ID = 9L;
 
     @BeforeEach
     void setUp() {
-        carteira = new Carteira("Carteira", "CARTEIRA", null);
+        carteira = new Carteira("Carteira", "CARTEIRA", null, TestUsuarios.novo("owner"));
         acao = new Acao("PETR4", "Petrobras", Mercado.BRASIL, new BigDecimal("30"), DIA_1);
         service = new OperacaoService(operacoes, carteiras, acoes);
-        when(carteiras.findByIdForUpdate(1L)).thenReturn(Optional.of(carteira));
+        when(carteiras.findByIdAndUsuarioIdForUpdate(1L, USUARIO_ID)).thenReturn(Optional.of(carteira));
         when(acoes.findById(2L)).thenReturn(Optional.of(acao));
         lenient().when(operacoes.saveAndFlush(any(Operacao.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -46,7 +48,7 @@ class OperacaoServiceTest {
     @Test
     void permiteVendaParcialQuandoHaSaldoSuficiente() {
         vendasExistentes(operacao(TipoOperacao.COMPRA, "10", DIA_1));
-        var response = service.cadastrar(request(TipoOperacao.VENDA, "5", DIA_2));
+        var response = service.cadastrar(request(TipoOperacao.VENDA, "5", DIA_2), USUARIO_ID);
         assertThat(response.tipo()).isEqualTo(TipoOperacao.VENDA);
         verify(operacoes).saveAndFlush(any(Operacao.class));
     }
@@ -54,14 +56,14 @@ class OperacaoServiceTest {
     @Test
     void permiteVendaQueZeraSaldo() {
         vendasExistentes(operacao(TipoOperacao.COMPRA, "10", DIA_1));
-        service.cadastrar(request(TipoOperacao.VENDA, "10", DIA_2));
+        service.cadastrar(request(TipoOperacao.VENDA, "10", DIA_2), USUARIO_ID);
         verify(operacoes).saveAndFlush(any(Operacao.class));
     }
 
     @Test
     void rejeitaVendaSuperiorAoSaldoSemPersistir() {
         vendasExistentes(operacao(TipoOperacao.COMPRA, "10", DIA_1));
-        assertThatThrownBy(() -> service.cadastrar(request(TipoOperacao.VENDA, "11", DIA_2)))
+        assertThatThrownBy(() -> service.cadastrar(request(TipoOperacao.VENDA, "11", DIA_2), USUARIO_ID))
                 .isInstanceOf(SaldoInsuficienteParaVendaException.class);
         verify(operacoes, never()).saveAndFlush(any());
     }
@@ -69,7 +71,7 @@ class OperacaoServiceTest {
     @Test
     void rejeitaVendaSemCompraAnteriorSemPersistir() {
         vendasExistentes();
-        assertThatThrownBy(() -> service.cadastrar(request(TipoOperacao.VENDA, "1", DIA_1)))
+        assertThatThrownBy(() -> service.cadastrar(request(TipoOperacao.VENDA, "1", DIA_1), USUARIO_ID))
                 .isInstanceOf(SaldoInsuficienteParaVendaException.class);
         verify(operacoes, never()).saveAndFlush(any());
     }
@@ -77,7 +79,7 @@ class OperacaoServiceTest {
     @Test
     void rejeitaVendaRetroativaQueInvalidaVendaPosterior() {
         vendasExistentes(operacao(TipoOperacao.COMPRA, "10", DIA_1), operacao(TipoOperacao.VENDA, "8", DIA_3));
-        assertThatThrownBy(() -> service.cadastrar(request(TipoOperacao.VENDA, "5", DIA_2)))
+        assertThatThrownBy(() -> service.cadastrar(request(TipoOperacao.VENDA, "5", DIA_2), USUARIO_ID))
                 .isInstanceOf(SaldoInsuficienteParaVendaException.class);
         verify(operacoes, never()).saveAndFlush(any());
     }
@@ -85,20 +87,20 @@ class OperacaoServiceTest {
     @Test
     void permiteVendaRetroativaQuandoTodaSequenciaPermaneceValida() {
         vendasExistentes(operacao(TipoOperacao.COMPRA, "10", DIA_1), operacao(TipoOperacao.VENDA, "8", DIA_3));
-        service.cadastrar(request(TipoOperacao.VENDA, "2", DIA_2));
+        service.cadastrar(request(TipoOperacao.VENDA, "2", DIA_2), USUARIO_ID);
         verify(operacoes).saveAndFlush(any(Operacao.class));
     }
 
     @Test
     void consideraVendaComMesmoTimestampDepoisDasOperacoesPersistidas() {
         vendasExistentes(operacao(TipoOperacao.COMPRA, "10", DIA_1));
-        service.cadastrar(request(TipoOperacao.VENDA, "10", DIA_1));
+        service.cadastrar(request(TipoOperacao.VENDA, "10", DIA_1), USUARIO_ID);
         verify(operacoes).saveAndFlush(any(Operacao.class));
     }
 
     @Test
     void cadastraCompraSemConsultarSequencia() {
-        var response = service.cadastrar(request(TipoOperacao.COMPRA, "10", DIA_1));
+        var response = service.cadastrar(request(TipoOperacao.COMPRA, "10", DIA_1), USUARIO_ID);
         assertThat(response.tipo()).isEqualTo(TipoOperacao.COMPRA);
         verify(operacoes).saveAndFlush(any(Operacao.class));
         verify(operacoes, never()).findByCarteiraIdAndAcaoIdOrderByDataOperacaoAscIdAsc(any(), any());

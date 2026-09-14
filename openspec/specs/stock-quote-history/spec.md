@@ -6,6 +6,30 @@ Registrar e consultar observações históricas de cotações reais utilizadas p
 
 ## Requirements
 
+### Requirement: Evitar duplicação funcional de observações históricas
+
+O sistema SHALL preservar todas as observações históricas existentes e SHALL evitar uma nova inserção quando já existir uma observação para a mesma ação, cotação e `dataHoraCotacao`. A mesma cotação em timestamp diferente e uma cotação diferente permanecem observações válidas para inserção. Esta proteção ocorre no fluxo de serviço/repositório, sem limpeza automática, exclusão, backfill, migration ou constraint UNIQUE nesta evolução.
+
+#### Scenario: Evento de cotação idêntico
+
+- **WHEN** uma ação recebe a mesma cotação no mesmo `dataHoraCotacao` de uma observação já persistida
+- **THEN** a cotação atual pode ser atualizada normalmente, mas nenhuma nova observação histórica é inserida
+
+#### Scenario: Mesma cotação em novo timestamp
+
+- **WHEN** uma ação recebe a mesma cotação em um `dataHoraCotacao` diferente
+- **THEN** uma nova observação histórica é persistida
+
+#### Scenario: Cotação diferente
+
+- **WHEN** uma ação recebe uma cotação diferente
+- **THEN** uma nova observação histórica é persistida conforme o fluxo existente
+
+#### Scenario: Histórico legado
+
+- **WHEN** a proteção é disponibilizada em uma base que já contém duplicatas
+- **THEN** nenhuma observação antiga é apagada, mesclada ou alterada
+
 ### Requirement: Registrar observações de cotação
 
 O sistema SHALL persistir uma observação imutável contendo ação, cotação positiva e timestamp da fonte sempre que um cadastro ou atualização de cotação for concluído com dados externos válidos. A observação MUST usar os mesmos dados aceitos para atualizar a cotação atual e MUST NOT ser criada para respostas inválidas ou falhas externas. O cadastro inicial e cada atualização MUST gravar a cotação atual e sua observação histórica como uma única unidade atômica: se qualquer uma das duas persistências falhar, a operação MUST falhar e nenhuma alteração parcial poderá permanecer persistida.

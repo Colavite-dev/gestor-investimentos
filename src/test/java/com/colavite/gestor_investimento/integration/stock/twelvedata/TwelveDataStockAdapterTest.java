@@ -4,6 +4,7 @@ import com.colavite.gestor_investimento.entity.Moeda;
 import com.colavite.gestor_investimento.exception.InvalidStockDataResponseException;
 import com.colavite.gestor_investimento.exception.StockProviderUnavailableException;
 import com.colavite.gestor_investimento.exception.StockTickerNotFoundException;
+import com.colavite.gestor_investimento.exception.StockVenueAmbiguityException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -87,7 +88,7 @@ class TwelveDataStockAdapterTest {
         Fixture fixture = fixture("key");
         String payload = "{\"data\":["
                 + "{\"symbol\":\"AAPL\",\"instrument_type\":\"ETF\",\"country\":\"United States\",\"currency\":\"USD\"},"
-                + "{\"symbol\":\"AAPL\",\"instrument_type\":\"Common Stock\",\"country\":\"United States\",\"currency\":\"USD\"}],\"status\":\"ok\"}";
+                + "{\"symbol\":\"AAPL\",\"instrument_type\":\"Common Stock\",\"country\":\"United States\",\"currency\":\"USD\",\"exchange\":\"NASDAQ\",\"mic_code\":\"XNGS\"}],\"status\":\"ok\"}";
         fixture.server.expect(requestTo("http://twelve.test/symbol_search?symbol=AAPL"))
                 .andRespond(withSuccess(payload, MediaType.APPLICATION_JSON));
         fixture.server.expect(requestTo("http://twelve.test/quote?symbol=AAPL"))
@@ -219,14 +220,43 @@ class TwelveDataStockAdapterTest {
     void rejeitaSimboloAmbiguoSemConsultarQuote() {
         Fixture fixture = fixture("key");
         String payload = "{\"data\":["
-                + "{\"symbol\":\"AAPL\",\"instrument_type\":\"Common Stock\",\"country\":\"United States\",\"currency\":\"USD\"},"
-                + "{\"symbol\":\"AAPL\",\"instrument_type\":\"Common Stock\",\"country\":\"United States\",\"currency\":\"USD\"}],\"status\":\"ok\"}";
+                + result("AAPL", "NASDAQ", "XNGS") + "," + result("AAPL", "NYSE", "XNYS") + "] ,\"status\":\"ok\"}";
         fixture.server.expect(requestTo("http://twelve.test/symbol_search?symbol=AAPL"))
                 .andRespond(withSuccess(payload, MediaType.APPLICATION_JSON));
 
         assertThatThrownBy(() -> fixture.adapter.consultar("AAPL"))
-                .isInstanceOf(StockTickerNotFoundException.class);
+                .isInstanceOf(StockVenueAmbiguityException.class);
         fixture.server.verify();
+    }
+
+    @Test
+    void prefereNasdaqAoIexIndependentementeDaOrdemDoPayload() {
+        assertPreferredVenue("AAPL", result("AAPL", "NASDAQ", "XNGS") + "," + result("AAPL", "IEX", "IEXG"));
+        assertPreferredVenue("AAPL", result("AAPL", "IEX", "IEXG") + "," + result("AAPL", "NASDAQ", "XNGS"));
+    }
+
+    @Test
+    void prefereNyseENyseAmericanAoIex() {
+        assertPreferredVenue("IBM", result("IBM", "NYSE", "XNYS") + "," + result("IBM", "IEX", "IEXG"));
+        assertPreferredVenue("SPRT", result("SPRT", "NYSE American", "XASE") + "," + result("SPRT", "IEX", "IEXG"));
+    }
+
+    @Test
+    void usaIexComoFallbackQuandoEhOMatchElegivelUnico() {
+        Fixture fixture = fixture("key");
+        fixture.server.expect(requestTo("http://twelve.test/symbol_search?symbol=AAPL"))
+                .andRespond(withSuccess(searchResults(result("AAPL", "IEX", "IEXG")), MediaType.APPLICATION_JSON));
+        fixture.server.expect(requestTo("http://twelve.test/quote?symbol=AAPL"))
+                .andRespond(withSuccess(quote("AAPL", "Apple Inc.", "USD", "213.49", 1756684800L), MediaType.APPLICATION_JSON));
+
+        assertThat(fixture.adapter.consultar("AAPL").ticker()).isEqualTo("AAPL");
+        fixture.server.verify();
+    }
+
+    @Test
+    void rejeitaMultiplosFallbacksOuVenuesSemPrioridadeSemConsultarQuote() {
+        assertAmbiguous(result("AAPL", "IEX", "IEXG") + "," + result("AAPL", "IEX", "IEXG"));
+        assertAmbiguous(result("AAPL", "BATS", "BATS") + "," + result("AAPL", "ARCA", "ARCX"));
     }
 
     @Test
@@ -247,6 +277,27 @@ class TwelveDataStockAdapterTest {
         fixture.server.verify();
     }
 
+    private void assertPreferredVenue(String ticker, String results) {
+        Fixture fixture = fixture("key");
+        fixture.server.expect(requestTo("http://twelve.test/symbol_search?symbol=" + ticker))
+                .andRespond(withSuccess(searchResults(results), MediaType.APPLICATION_JSON));
+        fixture.server.expect(requestTo("http://twelve.test/quote?symbol=" + ticker))
+                .andRespond(withSuccess(quote(ticker, "Company", "USD", "213.49", 1756684800L), MediaType.APPLICATION_JSON));
+
+        assertThat(fixture.adapter.consultar(ticker).ticker()).isEqualTo(ticker);
+        fixture.server.verify();
+    }
+
+    private void assertAmbiguous(String results) {
+        Fixture fixture = fixture("key");
+        fixture.server.expect(requestTo("http://twelve.test/symbol_search?symbol=AAPL"))
+                .andRespond(withSuccess(searchResults(results), MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> fixture.adapter.consultar("AAPL"))
+                .isInstanceOf(StockVenueAmbiguityException.class);
+        fixture.server.verify();
+    }
+
     private void assertInvalidQuote(String quotePayload) {
         Fixture fixture = fixture("key");
         fixture.server.expect(requestTo("http://twelve.test/symbol_search?symbol=AAPL"))
@@ -264,8 +315,17 @@ class TwelveDataStockAdapterTest {
     }
 
     private String search(String symbol, String type, String country, String currency) {
-        return "{\"data\":[{\"symbol\":\"%s\",\"instrument_name\":\"Empresa\",\"instrument_type\":\"%s\",\"country\":\"%s\",\"currency\":\"%s\"}],\"status\":\"ok\"}"
+        return "{\"data\":[{\"symbol\":\"%s\",\"instrument_name\":\"Empresa\",\"instrument_type\":\"%s\",\"country\":\"%s\",\"currency\":\"%s\",\"exchange\":\"NASDAQ\",\"mic_code\":\"XNGS\"}],\"status\":\"ok\"}"
                 .formatted(symbol, type, country, currency);
+    }
+
+    private String searchResults(String results) {
+        return "{\"data\":[" + results + "],\"status\":\"ok\"}";
+    }
+
+    private String result(String symbol, String exchange, String micCode) {
+        return "{\"symbol\":\"%s\",\"instrument_name\":\"Empresa\",\"instrument_type\":\"Common Stock\",\"country\":\"United States\",\"currency\":\"USD\",\"exchange\":\"%s\",\"mic_code\":\"%s\"}"
+                .formatted(symbol, exchange, micCode);
     }
 
     private String quote(String symbol, String name, String currency, String close, Long timestamp) {

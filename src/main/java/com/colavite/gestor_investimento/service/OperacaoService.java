@@ -14,8 +14,8 @@ import java.util.List;
 @Service public class OperacaoService {
     private final OperacaoRepository operacoes; private final CarteiraRepository carteiras; private final AcaoRepository acoes;
     public OperacaoService(OperacaoRepository operacoes, CarteiraRepository carteiras, AcaoRepository acoes) { this.operacoes=operacoes; this.carteiras=carteiras; this.acoes=acoes; }
-    @Transactional public OperacaoResponse cadastrar(OperacaoRequest r) {
-        var carteira = carteiras.findByIdForUpdate(r.carteiraId()).orElseThrow(() -> CarteiraNotFoundException.porId(r.carteiraId()));
+    @Transactional public OperacaoResponse cadastrar(OperacaoRequest r, Long usuarioId) {
+        var carteira = carteiras.findByIdAndUsuarioIdForUpdate(r.carteiraId(), usuarioId).orElseThrow(() -> CarteiraNotFoundException.porId(r.carteiraId()));
         var acao = acoes.findById(r.acaoId()).orElseThrow(() -> AcaoNotFoundException.porId(r.acaoId()));
         Operacao candidata = new Operacao(carteira, acao, r.tipo(), r.quantidade(), r.precoUnitario(), r.dataOperacao());
         if (r.tipo() == TipoOperacao.VENDA) {
@@ -23,8 +23,8 @@ import java.util.List;
         }
         return OperacaoMapper.toResponse(operacoes.saveAndFlush(candidata));
     }
-    @Transactional(readOnly=true) public OperacaoResponse buscarPorId(Long id) { return operacoes.findById(id).map(OperacaoMapper::toResponse).orElseThrow(() -> OperacaoNotFoundException.porId(id)); }
-    @Transactional(readOnly=true) public List<OperacaoResponse> listarPorCarteira(Long id) { if (!carteiras.existsById(id)) throw CarteiraNotFoundException.porId(id); return operacoes.findByCarteiraIdOrderByDataOperacaoAscIdAsc(id).stream().map(OperacaoMapper::toResponse).toList(); }
+    @Transactional(readOnly=true) public OperacaoResponse buscarPorId(Long id, Long usuarioId) { return operacoes.findByIdAndCarteiraUsuarioId(id, usuarioId).map(OperacaoMapper::toResponse).orElseThrow(() -> OperacaoNotFoundException.porId(id)); }
+    @Transactional(readOnly=true) public List<OperacaoResponse> listarPorCarteira(Long id, Long usuarioId) { carteiras.findByIdAndUsuarioId(id, usuarioId).orElseThrow(() -> CarteiraNotFoundException.porId(id)); return operacoes.findByCarteiraIdOrderByDataOperacaoAscIdAsc(id).stream().map(OperacaoMapper::toResponse).toList(); }
     private void validarSaldoDaSequencia(Long carteiraId, Long acaoId, Operacao candidata) {
         List<Operacao> sequencia = new ArrayList<>(operacoes.findByCarteiraIdAndAcaoIdOrderByDataOperacaoAscIdAsc(carteiraId, acaoId));
         sequencia.add(candidata);

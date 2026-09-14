@@ -1,7 +1,14 @@
 HELP.md
-/.env
+
+### Environment and local credentials ###
+.env
+.env.*
+!.env.example
+
+### Maven / Java generated files ###
 target/
 .mvn/wrapper/maven-wrapper.jar
+*.class
 !**/src/main/**/target/
 !**/src/test/**/target/
 
@@ -15,7 +22,7 @@ target/
 .sts4-cache
 
 ### IntelliJ IDEA ###
-.idea
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -32,4 +39,37 @@ build/
 
 ### VS Code ###
 .vscode/
-.env.backup
+
+### Frontend generated files ###
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+### Logs and temporary files ###
+*.log
+*.tmp
+*.bak
+*.backup
+*.orig
+*.swp
+*.swo
+
+### Common caches and reports ###
+.cache/
+.npm/
+.parcel-cache/
+.turbo/
+.vite/
+.eslintcache
+coverage/
+
+### Local databases ###
+*.db
+*.sqlite
+*.sqlite3
+*.mv.db
+*.trace.db
+
+### Operating system files ###
+.DS_Store
+Thumbs.db

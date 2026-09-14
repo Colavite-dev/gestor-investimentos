@@ -1,5 +1,7 @@
 package com.colavite.gestor_investimento.controller;
 
+import org.springframework.security.test.context.support.WithMockUser;
+
 import com.colavite.gestor_investimento.entity.Corretora;
 import com.colavite.gestor_investimento.exception.CnpjNotFoundException;
 import com.colavite.gestor_investimento.exception.CnpjProviderUnavailableException;
@@ -39,9 +41,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 @Transactional
+@WithMockUser
 class CorretoraControllerTest {
 
     @Autowired

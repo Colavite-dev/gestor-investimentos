@@ -4,52 +4,43 @@ As integrações são isoladas por ports/providers e adapters. Falhas externas s
 
 ## BrasilAPI — dados cadastrais de CNPJ
 
-- **Uso:** cadastro de Corretora, antes da persistência.
-- **Abstração:** `CnpjDataProvider` / `BrasilApiCnpjAdapter`.
-- **Autenticação:** não requerida para o endpoint consumido.
-- **Configuração:** `BRASIL_API_BASE_URL`, `BRASIL_API_CONNECT_TIMEOUT` (default `2s`) e `BRASIL_API_READ_TIMEOUT` (default `5s`).
-- **Erros:** CNPJ inexistente retorna 422; resposta inválida retorna 502; indisponibilidade, timeout, conexão ou rate limit retornam 503.
-- **Teste real:** `.\mvnw.cmd -Dtest=BrasilApiCnpjRealIT test`; execução explícita, fora da suíte normal.
+- **Adapter:** `CnpjDataProvider` / `BrasilApiCnpjAdapter`.
+- **Fluxo:** cadastro de Corretora antes da persistência.
+- **Endpoint externo:** `GET /api/cnpj/v1/{cnpj}`.
+- **Erros:** inexistente 422; payload inválido 502; timeout, conexão, rate limit ou indisponibilidade 503.
 
 ## ViaCEP — endereço por CEP
 
-- **Uso:** validação e enriquecimento de endereço no cadastro de Corretora.
-- **Abstração:** `CepDataProvider` / `ViaCepAdapter`.
-- **Autenticação:** não requerida.
-- **Configuração:** `VIA_CEP_BASE_URL`, `VIA_CEP_CONNECT_TIMEOUT` (default `2s`) e `VIA_CEP_READ_TIMEOUT` (default `5s`).
-- **Erros:** CEP não encontrado retorna 422; resposta inválida ou conflito geográfico retorna 502; indisponibilidade, timeout ou conexão retornam 503.
-- **Teste real:** `.\mvnw.cmd -Dtest=ViaCepRealIT test`; execução explícita, fora da suíte normal.
+- **Adapter:** `CepDataProvider` / `ViaCepAdapter`.
+- **Fluxo:** valida e enriquece endereço da Corretora antes do salvamento.
+- **Endpoint externo:** `GET /ws/{cep}/json/`.
+- **Erros:** CEP inexistente 422; resposta inválida ou conflito geográfico 502; indisponibilidade 503.
 
 ## CVM — participantes intermediários
 
-- **Uso:** validação final de elegibilidade da Corretora a partir do dataset oficial de participantes intermediários.
-- **Abstração:** `CvmParticipantProvider` / `CvmParticipantAdapter`.
-- **Autenticação:** não requerida.
-- **Configuração:** `CVM_PARTICIPANTS_DATASET_URL`, `CVM_PARTICIPANTS_CONNECT_TIMEOUT` (default `2s`), `CVM_PARTICIPANTS_READ_TIMEOUT` (default `10s`) e `CVM_PARTICIPANTS_REFRESH_INTERVAL` (default `24h`).
-- **Regra:** um CNPJ é elegível quando possui ao menos um registro ativo de Corretora ou Distribuidora; a decisão não depende da ordem das linhas do CSV.
-- **Erros:** participante não elegível retorna 422; ZIP/CSV inválido retorna 502; indisponibilidade, timeout, conexão ou rate limit retornam 503.
-- **Teste real:** `.\mvnw.cmd -Dtest=CvmParticipantRealIT -DrunCvmRealIT=true test`.
+- **Adapter:** `CvmParticipantProvider` / `CvmParticipantAdapter`.
+- **Fluxo:** consulta o dataset oficial de participantes; o CNPJ é elegível quando há registro ativo de Corretora ou Distribuidora.
+- **Endpoint externo:** URL configurável em `CVM_PARTICIPANTS_DATASET_URL`, cujo padrão é o ZIP `cad_intermed.zip` da CVM.
+- **Erros:** não elegível 422; ZIP/CSV inválido 502; indisponibilidade 503.
 
-## brapi — ações brasileiras
+## brapi — mercado brasileiro
 
-- **Uso:** cadastro e atualização de cotação de Ações no mercado `BRASIL`.
-- **Abstração:** `StockDataProvider` / `BrapiStockAdapter`.
-- **Autenticação:** `BRAPI_TOKEN` é opcional e, quando configurado, é usado apenas pelo adapter brapi.
-- **Configuração:** `BRAPI_BASE_URL`, `BRAPI_CONNECT_TIMEOUT` (default `2s`) e `BRAPI_READ_TIMEOUT` (default `5s`).
-- **Regra de identidade:** ticker solicitado, `requestedSymbol` e `symbol` devem coincidir após normalização e `changed` deve ser `false`. Alias, renomeação ou divergência são resposta externa inconsistente (502); não há renomeação automática.
-- **Erros:** resultado vazio ou 404 inequivocamente de ticker inexistente retorna 422; payload/4xx genérico inconsistente retorna 502; autorização, quota, 5xx, timeout e conexão retornam 503.
-- **Teste real:** `.\mvnw.cmd -Dtest=BrapiStockRealIT -DrunBrapiRealIT=true test`.
+- **Adapter:** `StockDataProvider` e `StockCatalogProvider` / `BrapiStockAdapter`.
+- **Pesquisa:** `GET /api/quote/list?search=...&type=stock&limit=20`.
+- **Catálogo:** `GET /api/quote/list?type=stock&page=...&limit=...&search=...`.
+- **Resolução/cotação:** `GET /api/v2/stocks/quote?symbols={ticker}`.
+- **Uso interno:** `GET /acoes/pesquisar`, `GET /acoes/catalogo`, `POST /acoes/resolver`, cadastro e atualização de ativos `BRASIL`.
+- **Erros:** ticker inexistente 422; conteúdo inconsistente 502; autorização, quota, timeout ou conexão 503.
 
-## Twelve Data — ações americanas
+## Twelve Data — mercado dos Estados Unidos
 
-- **Uso:** descoberta/validação de símbolo e cotação de Ações no mercado `ESTADOS_UNIDOS`; atualização usa a cotação da ação já persistida.
-- **Abstração:** `StockDataProvider` / `TwelveDataStockAdapter`.
-- **Autenticação:** `TWELVE_DATA_API_KEY` é necessária para a consulta americana e fica somente no ambiente local.
-- **Configuração:** `TWELVE_DATA_BASE_URL`, `TWELVE_DATA_CONNECT_TIMEOUT` (default `2s`) e `TWELVE_DATA_READ_TIMEOUT` (default `5s`).
-- **Regra:** o símbolo precisa corresponder ao ticker e aos critérios americanos implementados; moeda incompatível, ausência de preço ou conteúdo inconsistente retornam 502.
-- **Erros:** ticker inequivocamente inválido, inexistente, não suportado ou ambíguo retorna 422; conteúdo malformado/inconsistente retorna 502; chave inválida, quota, 5xx, timeout ou conexão retornam 503.
-- **Teste real:** `.\mvnw.cmd -Dtest=TwelveDataStockRealIT -DrunTwelveDataRealIT=true test`, com `TWELVE_DATA_API_KEY` no ambiente.
+- **Adapter:** `StockDataProvider` e `StockCatalogProvider` / `TwelveDataStockAdapter`.
+- **Pesquisa/resolução:** `GET /symbol_search?symbol=...`.
+- **Catálogo:** `GET /stocks?country=United%20States&type=Common%20Stock&format=JSON&show_plan=false`.
+- **Cotação:** `GET /quote?symbol={ticker}`.
+- **Uso interno:** `GET /acoes/pesquisar`, `GET /acoes/catalogo`, `POST /acoes/resolver`, cadastro e atualização de ativos `ESTADOS_UNIDOS`.
+- **Erros:** ticker inválido/inexistente ou venue ambíguo 422; conteúdo inconsistente 502; chave, quota, timeout ou conexão 503.
 
-## Limites e disponibilidade
+## Configuração, limites e testes
 
-Não há retry automático. Rate limits e quotas dependem da política e do plano de cada provider; o projeto não fixa números que não controla. Os testes normais usam doubles/mocks ou H2 e não dependem de internet.
+URLs-base, timeouts e credenciais são lidos do ambiente. `BRAPI_TOKEN` é opcional; `TWELVE_DATA_API_KEY` é necessária para consultas americanas. Nenhum token é documentado ou armazenado na coleção Postman. Não há retry automático. Testes normais usam mocks/doubles; testes reais são opt-in e devem ser usados somente para validar compatibilidade do provider.

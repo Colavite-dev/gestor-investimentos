@@ -120,3 +120,49 @@ O sistema MUST aceitar quantidade e preço unitário somente quando forem positi
 
 - **WHEN** o cliente envia quantidade ou preço unitário com mais de oito casas decimais ou mais de onze algarismos inteiros
 - **THEN** o sistema responde `400 Bad Request` e não persiste a operação
+### Requirement: Cotação atual é apenas sugestão de preço da operação
+
+Ao selecionar uma ação persistida ou resolvida no formulário, o sistema SHALL tentar obter sua cotação atual e apresentá-la separadamente como referência. O preço unitário SHALL ser preenchido com essa cotação somente como sugestão e SHALL permanecer editável; o valor enviado no `POST /operacoes` SHALL ser o preço efetivamente persistido.
+
+#### Scenario: Usuário aceita a sugestão
+- **WHEN** a cotação é obtida e o usuário envia o formulário sem alterar o preço sugerido
+- **THEN** a operação é persistida com esse preço unitário
+
+#### Scenario: Usuário substitui a sugestão
+- **WHEN** a cotação é 32,47 e o usuário altera o preço unitário para 30,00
+- **THEN** a operação é persistida com preço unitário 30,00
+
+#### Scenario: Usuário edita enquanto a cotação carrega
+- **WHEN** o usuário informa manualmente um preço antes da resposta assíncrona
+- **THEN** a resposta tardia não sobrescreve o preço manual
+
+### Requirement: Falha de cotação não bloqueia preço manual
+
+Quando uma ação já puder ser identificada localmente e a cotação estiver indisponível, o formulário SHALL manter a ação selecionada, informar a falha e permitir o registro com um preço manual positivo. A falha MUST NOT substituir a cotação persistida por zero ou nulo.
+
+#### Scenario: Provider falha para ação local
+- **WHEN** a atualização de cotação falha após a seleção de uma ação persistida
+- **THEN** o usuário pode preencher um preço positivo e registrar a operação normalmente
+
+#### Scenario: Novo ativo não pode ser resolvido
+- **WHEN** um ativo ainda não persistido não pode ser validado pelo provider
+- **THEN** o sistema não inventa nem persiste sua identidade e informa que o ativo não pôde ser selecionado
+
+### Requirement: Operações respeitam o owner da carteira
+
+O sistema SHALL criar e consultar operações somente quando a carteira associada pertence ao usuário autenticado. A validação de saldo e a ordenação SHALL considerar exclusivamente as operações daquela carteira autorizada, preservando todas as regras financeiras existentes.
+
+#### Scenario: Compra na própria carteira
+
+- **WHEN** USER_A registra uma compra válida em sua própria carteira
+- **THEN** a operação é persistida e pode ser consultada por USER_A
+
+#### Scenario: Compra em carteira alheia
+
+- **WHEN** USER_B tenta registrar uma compra ou venda na carteira de USER_A
+- **THEN** a API responde `404 Not Found`, não executa a regra financeira sobre dados de USER_A e não persiste a operação
+
+#### Scenario: Consulta isolada de operações
+
+- **WHEN** USER_B consulta por ID uma operação ou lista operações da carteira de USER_A
+- **THEN** a API responde `404 Not Found` e não retorna fatos transacionais de USER_A

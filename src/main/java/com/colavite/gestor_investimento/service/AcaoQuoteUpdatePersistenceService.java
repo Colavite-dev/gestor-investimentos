@@ -4,6 +4,7 @@ import com.colavite.gestor_investimento.entity.Acao;
 import com.colavite.gestor_investimento.entity.Mercado;
 import com.colavite.gestor_investimento.exception.AcaoDuplicadaException;
 import com.colavite.gestor_investimento.exception.AcaoNotFoundException;
+import com.colavite.gestor_investimento.exception.AcaoResolutionRaceException;
 import com.colavite.gestor_investimento.integration.stock.StockQuoteData;
 import com.colavite.gestor_investimento.integration.stock.StockRegistrationData;
 import com.colavite.gestor_investimento.mapper.AcaoMapper;
@@ -36,6 +37,17 @@ class AcaoQuoteUpdatePersistenceService {
         }
         historico.registrar(acao, data.cotacaoAtual(), data.dataHoraCotacao());
         return acao;
+    }
+
+    @Transactional
+    public Acao resolver(StockRegistrationData data, Mercado mercado) {
+        try {
+            Acao acao = repository.saveAndFlush(AcaoMapper.toEntity(data, mercado));
+            historico.registrar(acao, data.cotacaoAtual(), data.dataHoraCotacao());
+            return acao;
+        } catch (DataIntegrityViolationException exception) {
+            throw new AcaoResolutionRaceException(exception);
+        }
     }
 
     @Transactional

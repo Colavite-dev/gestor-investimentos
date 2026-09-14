@@ -24,6 +24,7 @@ public class CotacaoHistoricaService {
 
     @Transactional
     public void registrar(Acao acao, java.math.BigDecimal cotacao, Instant dataHoraCotacao) {
+        if (historico.existsByAcaoIdAndCotacaoAndDataHoraCotacao(acao.getId(), cotacao, dataHoraCotacao)) return;
         historico.saveAndFlush(new CotacaoHistorica(acao, cotacao, dataHoraCotacao, Instant.now()));
     }
 

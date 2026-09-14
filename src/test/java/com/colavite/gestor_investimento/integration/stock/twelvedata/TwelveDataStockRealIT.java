@@ -34,4 +34,25 @@ class TwelveDataStockRealIT {
         assertThat(data.cotacaoAtual()).isPositive();
         assertThat(data.dataHoraCotacao()).isNotNull();
     }
+
+    @Test
+    void consultaInventarioRealAmericanoSemLogoOuCotacaoPorItem() {
+        String apiKey = System.getenv("TWELVE_DATA_API_KEY");
+        Assumptions.assumeTrue(StringUtils.hasText(apiKey), "TWELVE_DATA_API_KEY não configurada no ambiente do processo");
+
+        TwelveDataProperties properties = new TwelveDataProperties(
+                URI.create("https://api.twelvedata.com"), Duration.ofSeconds(3), Duration.ofSeconds(20), apiKey);
+        TwelveDataStockAdapter adapter = new TwelveDataStockAdapter(
+                new TwelveDataConfig().twelveDataRestClient(properties), properties);
+
+        var page = adapter.catalogar("Apple", 0, 10);
+
+        assertThat(page.items()).isNotEmpty().hasSizeLessThanOrEqualTo(10);
+        assertThat(page.items()).allSatisfy(item -> {
+            assertThat(item.mercado().name()).isEqualTo("ESTADOS_UNIDOS");
+            assertThat(item.moeda()).isEqualTo(Moeda.USD);
+            assertThat(item.logoUrl()).isNull();
+            assertThat(item.cotacaoAtual()).isNull();
+        });
+    }
 }

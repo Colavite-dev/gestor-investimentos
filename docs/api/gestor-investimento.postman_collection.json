@@ -1,39 +1,117 @@
 {
-  "info": { "name": "Gestor de Investimentos API", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+  "info": {
+    "name": "Adapt Invest API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:8080" },
-    { "key": "corretoraId", "value": "1" }, { "key": "cnpj", "value": "19131243000197" },
-    { "key": "acaoId", "value": "1" }, { "key": "ticker", "value": "PETR4" }, { "key": "mercado", "value": "BRASIL" },
-    { "key": "carteiraId", "value": "1" }, { "key": "operacaoId", "value": "1" }
+    { "key": "token", "value": "" },
+    { "key": "demoUsername", "value": "" },
+    { "key": "demoPassword", "value": "" },
+    { "key": "demoEmail", "value": "" },
+    { "key": "corretoraId", "value": "1" },
+    { "key": "cnpj", "value": "19131243000197" },
+    { "key": "acaoId", "value": "1" },
+    { "key": "ticker", "value": "PETR4" },
+    { "key": "mercado", "value": "BRASIL" },
+    { "key": "q", "value": "PETR" },
+    { "key": "page", "value": "0" },
+    { "key": "size", "value": "20" },
+    { "key": "carteiraId", "value": "1" },
+    { "key": "operacaoId", "value": "1" }
   ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
   "item": [
-    { "name": "Corretoras", "item": [
-      { "name": "Cadastrar", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"cnpj\": \"{{cnpj}}\"\n}"}, "url": "{{baseUrl}}/corretoras" } },
-      { "name": "Listar", "request": { "method": "GET", "url": "{{baseUrl}}/corretoras" } },
-      { "name": "Buscar por ID", "request": { "method": "GET", "url": "{{baseUrl}}/corretoras/{{corretoraId}}" } },
-      { "name": "Buscar por CNPJ", "request": { "method": "GET", "url": "{{baseUrl}}/corretoras/cnpj/{{cnpj}}" } }
-    ] },
-    { "name": "Ações", "item": [
-      { "name": "Cadastrar ação brasileira", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"ticker\": \"{{ticker}}\",\n  \"mercado\": \"{{mercado}}\"\n}"}, "url": "{{baseUrl}}/acoes" } },
-      { "name": "Listar", "request": { "method": "GET", "url": "{{baseUrl}}/acoes" } },
-      { "name": "Buscar por ID", "request": { "method": "GET", "url": "{{baseUrl}}/acoes/{{acaoId}}" } },
-      { "name": "Buscar por ticker e mercado", "request": { "method": "GET", "url": "{{baseUrl}}/acoes/ticker/{{ticker}}?mercado={{mercado}}" } },
-      { "name": "Atualizar cotação", "request": { "method": "PUT", "url": "{{baseUrl}}/acoes/{{acaoId}}/atualizar-cotacao" } }
-    ] },
-    { "name": "Histórico de Cotações", "item": [
-      { "name": "Consultar histórico", "request": { "method": "GET", "url": "{{baseUrl}}/acoes/{{acaoId}}/historico-cotacoes?de=2026-01-01T00:00:00Z&ate=2026-12-31T23:59:59Z" } }
-    ] },
-    { "name": "Carteiras", "item": [
-      { "name": "Cadastrar", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"nome\": \"Carteira Principal\",\n  \"descricao\": \"Exemplo acadêmico\"\n}"}, "url": "{{baseUrl}}/carteiras" } },
-      { "name": "Listar", "request": { "method": "GET", "url": "{{baseUrl}}/carteiras" } },
-      { "name": "Buscar por ID", "request": { "method": "GET", "url": "{{baseUrl}}/carteiras/{{carteiraId}}" } },
-      { "name": "Listar operações", "request": { "method": "GET", "url": "{{baseUrl}}/carteiras/{{carteiraId}}/operacoes" } },
-      { "name": "Listar posições", "request": { "method": "GET", "url": "{{baseUrl}}/carteiras/{{carteiraId}}/posicoes" } },
-      { "name": "Consultar resumo", "request": { "method": "GET", "url": "{{baseUrl}}/carteiras/{{carteiraId}}/resumo" } }
-    ] },
-    { "name": "Operações", "item": [
-      { "name": "Registrar compra", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"carteiraId\": {{carteiraId}},\n  \"acaoId\": {{acaoId}},\n  \"tipo\": \"COMPRA\",\n  \"quantidade\": 10.00000000,\n  \"precoUnitario\": 20.00000000,\n  \"dataOperacao\": \"2026-09-07T12:00:00Z\"\n}"}, "url": "{{baseUrl}}/operacoes" } },
-      { "name": "Buscar por ID", "request": { "method": "GET", "url": "{{baseUrl}}/operacoes/{{operacaoId}}" } }
-    ] }
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Registrar usuário",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Usuário de demonstração\",\n  \"username\": \"{{demoUsername}}\",\n  \"email\": \"{{demoEmail}}\",\n  \"password\": \"{{demoPassword}}\"\n}" },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Login",
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": [
+              "if (pm.response.code === 200) {",
+              "  const body = pm.response.json();",
+              "  if (body.accessToken) pm.collectionVariables.set('token', body.accessToken);",
+              "}"
+            ] }
+          }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{demoUsername}}\",\n  \"password\": \"{{demoPassword}}\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        { "name": "Usuário autenticado", "request": { "method": "GET", "url": "{{baseUrl}}/auth/me" } }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        { "name": "Listar usuários", "request": { "method": "GET", "url": "{{baseUrl}}/admin/users" } },
+        { "name": "Métricas", "request": { "method": "GET", "url": "{{baseUrl}}/admin/metrics" } }
+      ]
+    },
+    {
+      "name": "Corretoras",
+      "item": [
+        { "name": "Cadastrar", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"cnpj\": \"{{cnpj}}\"\n}" }, "url": "{{baseUrl}}/corretoras" } },
+        { "name": "Listar", "request": { "method": "GET", "url": "{{baseUrl}}/corretoras" } },
+        { "name": "Buscar por ID", "request": { "method": "GET", "url": "{{baseUrl}}/corretoras/{{corretoraId}}" } },
+        { "name": "Buscar por CNPJ", "request": { "method": "GET", "url": "{{baseUrl}}/corretoras/cnpj/{{cnpj}}" } }
+      ]
+    },
+    {
+      "name": "Ações",
+      "item": [
+        { "name": "Cadastrar", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"ticker\": \"{{ticker}}\",\n  \"mercado\": \"{{mercado}}\"\n}" }, "url": "{{baseUrl}}/acoes" } },
+        { "name": "Listar", "request": { "method": "GET", "url": "{{baseUrl}}/acoes" } },
+        { "name": "Pesquisar", "request": { "method": "GET", "url": "{{baseUrl}}/acoes/pesquisar?q={{q}}" } },
+        { "name": "Catálogo", "request": { "method": "GET", "url": "{{baseUrl}}/acoes/catalogo?mercado={{mercado}}&q={{q}}&page={{page}}&size={{size}}" } },
+        { "name": "Resolver e cadastrar", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"ticker\": \"{{ticker}}\",\n  \"mercado\": \"{{mercado}}\"\n}" }, "url": "{{baseUrl}}/acoes/resolver" } },
+        { "name": "Buscar por ticker e mercado", "request": { "method": "GET", "url": "{{baseUrl}}/acoes/ticker/{{ticker}}?mercado={{mercado}}" } },
+        { "name": "Buscar por ID", "request": { "method": "GET", "url": "{{baseUrl}}/acoes/{{acaoId}}" } },
+        { "name": "Atualizar cotação", "request": { "method": "PUT", "url": "{{baseUrl}}/acoes/{{acaoId}}/atualizar-cotacao" } }
+      ]
+    },
+    {
+      "name": "Histórico de Cotações",
+      "item": [
+        { "name": "Consultar histórico", "request": { "method": "GET", "url": "{{baseUrl}}/acoes/{{acaoId}}/historico-cotacoes?de=2026-01-01T00:00:00Z&ate=2026-12-31T23:59:59Z" } }
+      ]
+    },
+    {
+      "name": "Carteiras",
+      "item": [
+        { "name": "Cadastrar", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Carteira Principal\",\n  \"descricao\": \"Exemplo acadêmico\"\n}" }, "url": "{{baseUrl}}/carteiras" } },
+        { "name": "Listar", "request": { "method": "GET", "url": "{{baseUrl}}/carteiras" } },
+        { "name": "Buscar por ID", "request": { "method": "GET", "url": "{{baseUrl}}/carteiras/{{carteiraId}}" } },
+        { "name": "Listar operações", "request": { "method": "GET", "url": "{{baseUrl}}/carteiras/{{carteiraId}}/operacoes" } },
+        { "name": "Listar posições", "request": { "method": "GET", "url": "{{baseUrl}}/carteiras/{{carteiraId}}/posicoes" } },
+        { "name": "Consultar resumo", "request": { "method": "GET", "url": "{{baseUrl}}/carteiras/{{carteiraId}}/resumo" } }
+      ]
+    },
+    {
+      "name": "Operações",
+      "item": [
+        { "name": "Registrar compra", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"carteiraId\": {{carteiraId}},\n  \"acaoId\": {{acaoId}},\n  \"tipo\": \"COMPRA\",\n  \"quantidade\": 10.00000000,\n  \"precoUnitario\": 20.00000000,\n  \"dataOperacao\": \"2026-09-07T12:00:00Z\"\n}" }, "url": "{{baseUrl}}/operacoes" } },
+        { "name": "Buscar por ID", "request": { "method": "GET", "url": "{{baseUrl}}/operacoes/{{operacaoId}}" } }
+      ]
+    }
   ]
 }

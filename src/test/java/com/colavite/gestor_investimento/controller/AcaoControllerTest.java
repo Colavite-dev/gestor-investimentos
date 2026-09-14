@@ -1,13 +1,20 @@
 package com.colavite.gestor_investimento.controller;
 
+import org.springframework.security.test.context.support.WithMockUser;
+
 import com.colavite.gestor_investimento.entity.Mercado;
 import com.colavite.gestor_investimento.entity.Moeda;
 import com.colavite.gestor_investimento.exception.InvalidStockDataResponseException;
 import com.colavite.gestor_investimento.exception.StockProviderUnavailableException;
 import com.colavite.gestor_investimento.exception.StockTickerNotFoundException;
+import com.colavite.gestor_investimento.exception.StockVenueAmbiguityException;
 import com.colavite.gestor_investimento.integration.stock.StockDataProviderSelector;
+import com.colavite.gestor_investimento.integration.stock.StockCatalogProviderSelector;
+import com.colavite.gestor_investimento.integration.stock.StockCatalogItemData;
+import com.colavite.gestor_investimento.integration.stock.StockCatalogPageData;
 import com.colavite.gestor_investimento.integration.stock.StockQuoteData;
 import com.colavite.gestor_investimento.integration.stock.StockRegistrationData;
+import com.colavite.gestor_investimento.integration.stock.StockSuggestionData;
 import com.colavite.gestor_investimento.integration.stock.brapi.BrapiStockAdapter;
 import com.colavite.gestor_investimento.integration.stock.twelvedata.TwelveDataStockAdapter;
 import com.colavite.gestor_investimento.repository.AcaoRepository;
@@ -25,24 +32,28 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 @Transactional
+@WithMockUser
 class AcaoControllerTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired AcaoRepository repository;
     @MockitoBean StockDataProviderSelector selector;
+    @MockitoBean StockCatalogProviderSelector catalogSelector;
     @MockitoBean BrapiStockAdapter brapiProvider;
     @MockitoBean TwelveDataStockAdapter twelveDataProvider;
 
@@ -50,6 +61,37 @@ class AcaoControllerTest {
     void setUp() {
         when(selector.para(Mercado.BRASIL)).thenReturn(brapiProvider);
         when(selector.para(Mercado.ESTADOS_UNIDOS)).thenReturn(twelveDataProvider);
+        when(catalogSelector.para(Mercado.BRASIL)).thenReturn(brapiProvider);
+        when(catalogSelector.para(Mercado.ESTADOS_UNIDOS)).thenReturn(twelveDataProvider);
+    }
+
+    @Test
+    void catalogoBrasileiroEhPaginadoENaoPersiste() throws Exception {
+        when(brapiProvider.catalogar("pet", 1, 10)).thenReturn(new StockCatalogPageData(java.util.List.of(
+                new StockCatalogItemData("PETR4", "Petrobras", Mercado.BRASIL, Moeda.BRL,
+                        null, null, new BigDecimal("32.47"), "https://icons.brapi.dev/icons/PETR4.svg")
+        ), 1, 10, true, 42L));
+
+        mockMvc.perform(get("/acoes/catalogo").param("mercado", "BRASIL").param("q", "pet")
+                        .param("page", "1").param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].ticker").value("PETR4"))
+                .andExpect(jsonPath("$.items[0].logoUrl").value("https://icons.brapi.dev/icons/PETR4.svg"))
+                .andExpect(jsonPath("$.items[0].cotacaoAtual").value(32.47))
+                .andExpect(jsonPath("$.hasNext").value(true))
+                .andExpect(jsonPath("$.totalElements").value(42));
+
+        assertThat(repository.count()).isZero();
+    }
+
+    @Test
+    void catalogoValidaMercadoEPaginacao() throws Exception {
+        mockMvc.perform(get("/acoes/catalogo").param("mercado", "INVALIDO"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/acoes/catalogo").param("mercado", "BRASIL").param("page", "-1"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/acoes/catalogo").param("mercado", "BRASIL").param("size", "51"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -103,6 +145,56 @@ class AcaoControllerTest {
         mockMvc.perform(post("/acoes").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ticker\":\"DOWN\",\"mercado\":\"ESTADOS_UNIDOS\"}"))
                 .andExpect(status().isServiceUnavailable());
+
+        when(twelveDataProvider.consultar("AMB")).thenThrow(new StockVenueAmbiguityException());
+        mockMvc.perform(post("/acoes/resolver").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticker\":\"AMB\",\"mercado\":\"ESTADOS_UNIDOS\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("múltiplos venues elegíveis")));
+    }
+
+    @Test
+    void pesquisaAgregaBrasilEEstadosUnidos() throws Exception {
+        when(brapiProvider.pesquisar("PET")).thenReturn(java.util.List.of(new StockSuggestionData("PETR4", "Petrobras", Mercado.BRASIL, Moeda.BRL)));
+        when(twelveDataProvider.pesquisar("PET")).thenReturn(java.util.List.of(new StockSuggestionData("PET", "Pet Corp", Mercado.ESTADOS_UNIDOS, Moeda.USD)));
+
+        mockMvc.perform(get("/acoes/pesquisar").param("q", " pet "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ticker").value("PET"))
+                .andExpect(jsonPath("$[1].ticker").value("PETR4"));
+
+        verify(brapiProvider).pesquisar("PET");
+        verify(twelveDataProvider).pesquisar("PET");
+    }
+
+    @Test
+    void pesquisaToleraFalhaDeUmProvider() throws Exception {
+        when(brapiProvider.pesquisar("AA")).thenThrow(new StockProviderUnavailableException());
+        when(twelveDataProvider.pesquisar("AA")).thenReturn(java.util.List.of(new StockSuggestionData("AAPL", "Apple", Mercado.ESTADOS_UNIDOS, Moeda.USD)));
+
+        mockMvc.perform(get("/acoes/pesquisar").param("q", "AA"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ticker").value("AAPL"));
+    }
+
+    @Test
+    void pesquisaClassificaIndisponibilidadeEConteudoInvalidoQuandoNenhumProviderResponde() throws Exception {
+        when(brapiProvider.pesquisar("AA")).thenThrow(new StockProviderUnavailableException());
+        when(twelveDataProvider.pesquisar("AA")).thenThrow(new StockProviderUnavailableException());
+        mockMvc.perform(get("/acoes/pesquisar").param("q", "AA"))
+                .andExpect(status().isServiceUnavailable());
+
+        when(brapiProvider.pesquisar("BB")).thenThrow(new InvalidStockDataResponseException());
+        when(twelveDataProvider.pesquisar("BB")).thenThrow(new InvalidStockDataResponseException());
+        mockMvc.perform(get("/acoes/pesquisar").param("q", "BB"))
+                .andExpect(status().isBadGateway());
+    }
+
+    @Test
+    void pesquisaRejeitaTermoCurtoAntesDosProviders() throws Exception {
+        mockMvc.perform(get("/acoes/pesquisar").param("q", "A"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(selector, brapiProvider, twelveDataProvider);
     }
 
     @Test

@@ -8,7 +8,9 @@ record TwelveDataSymbolSearchResponse(List<Result> data, String status, Integer 
             String instrument_name,
             String instrument_type,
             String country,
-            String currency
+            String currency,
+            String exchange,
+            String mic_code
     ) {
     }
 }

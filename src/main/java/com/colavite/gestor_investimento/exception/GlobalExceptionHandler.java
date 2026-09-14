@@ -87,6 +87,16 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(UsuarioDuplicadoException.class)
+    public ResponseEntity<ApiErrorResponse> handleUsuarioDuplicado(UsuarioDuplicadoException exception, HttpServletRequest request) {
+        return response(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(CredenciaisInvalidasException.class)
+    public ResponseEntity<ApiErrorResponse> handleCredenciaisInvalidas(CredenciaisInvalidasException exception, HttpServletRequest request) {
+        return response(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, Map.of());
+    }
+
     @ExceptionHandler(AcaoDuplicadaException.class)
     public ResponseEntity<ApiErrorResponse> handleAcaoDuplicada(AcaoDuplicadaException exception, HttpServletRequest request) {
         return response(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
@@ -119,6 +129,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(StockTickerNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleStockTickerNotFound(StockTickerNotFoundException exception, HttpServletRequest request) {
+        return response(HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(StockVenueAmbiguityException.class)
+    public ResponseEntity<ApiErrorResponse> handleStockVenueAmbiguity(StockVenueAmbiguityException exception, HttpServletRequest request) {
         return response(HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage(), request, Map.of());
     }
 

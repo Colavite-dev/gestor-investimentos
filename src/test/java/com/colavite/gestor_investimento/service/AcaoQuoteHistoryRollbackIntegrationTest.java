@@ -5,6 +5,7 @@ import com.colavite.gestor_investimento.entity.Acao;
 import com.colavite.gestor_investimento.entity.Mercado;
 import com.colavite.gestor_investimento.entity.Moeda;
 import com.colavite.gestor_investimento.integration.stock.StockDataProviderSelector;
+import com.colavite.gestor_investimento.integration.stock.StockCatalogProviderSelector;
 import com.colavite.gestor_investimento.integration.stock.StockQuoteData;
 import com.colavite.gestor_investimento.integration.stock.StockRegistrationData;
 import com.colavite.gestor_investimento.integration.stock.brapi.BrapiStockAdapter;
@@ -36,6 +37,7 @@ class AcaoQuoteHistoryRollbackIntegrationTest {
     @Autowired private AcaoRepository acoes;
     @Autowired private CotacaoHistoricaRepository historicoRepository;
     @MockitoBean private StockDataProviderSelector selector;
+    @MockitoBean private StockCatalogProviderSelector catalogSelector;
     @MockitoBean private BrapiStockAdapter provider;
     @MockitoBean private CotacaoHistoricaService historico;
 

@@ -1,30 +1,30 @@
-# PRD — Gestor de Investimentos
+# PRD — Adapt Invest
 
 ## Visão
 
-API REST em Java/Spring Boot para gestão de corretoras, ações e carteiras de investimento com dados de fontes externas. O núcleo acadêmico obrigatório está implementado; Carteiras, Operações, posições e histórico são evoluções já entregues.
+Adapt Invest é uma API REST Java/Spring Boot para gestão acadêmica de corretoras, ativos e carteiras, complementada por um frontend React. O foco obrigatório é cadastro e consulta de corretoras e ações com integrações externas; carteira, operações, posições, histórico, autenticação e dashboard são evoluções já implementadas.
 
-## Núcleo acadêmico implementado
+## Estado atual do produto
 
-- Cadastrar, listar e buscar Corretoras por CNPJ ou ID.
-- Validar CNPJ, consultar dados empresariais, validar CEP/endereço e elegibilidade perante a CVM.
-- Cadastrar, listar e buscar Ações por ticker/mercado ou ID.
-- Consultar e atualizar cotações de ações BR e EUA por providers apropriados.
-- Impedir duplicidade de CNPJ e da identidade lógica da Ação.
+- Corretoras: cadastro por CNPJ, enriquecimento BrasilAPI/ViaCEP, elegibilidade CVM, listagem e busca por ID/CNPJ.
+- Ações: cadastro, consulta, atualização de cotação, busca, catálogo e resolução para mercados BR e EUA.
+- Carteiras: pertencem ao usuário autenticado; suportam operações de compra/venda, posições, preço médio e resumo por moeda.
+- Histórico: cotações são persistidas e consultáveis por intervalo.
+- Autenticação: JWT Bearer stateless, usuários `USER` e `ADMIN`, senhas BCrypt e endpoints administrativos protegidos.
+- Frontend: React + TypeScript + Vite, com autenticação, dashboard, catálogo de ativos, corretoras, carteiras, operações e histórico.
 
-## Evoluções implementadas
+## Regras de acesso
 
-- Carteiras nomeadas, Operações de compra/venda, posições, preço médio e resumo por moeda.
-- Histórico de cotações, integridade de venda sem saldo, precisão financeira e rollback transacional.
+O usuário autenticado é a fonte de identidade para recursos financeiros. `usuarioId` não é recebido como mecanismo de autorização. Carteiras, operações, posições e resumos são isolados por proprietário; consultas de outro usuário retornam `404`. `ADMIN` possui acesso aos endpoints administrativos, mas não possui acesso implícito às carteiras de terceiros. Ativos e dados de mercado são globais.
 
 ## Integrações e qualidade
 
-BrasilAPI, ViaCEP, CVM, brapi e Twelve Data são isoladas por providers/adapters. O backend usa PostgreSQL, Flyway, H2 nos testes, validação de entrada e tratamento centralizado de erros. Docker Compose fornece o PostgreSQL local.
+BrasilAPI, ViaCEP, CVM, brapi e Twelve Data são isoladas em providers/adapters. PostgreSQL é o banco de runtime, Flyway versiona V1–V8 e H2 é utilizado somente nos testes. Docker Compose fornece PostgreSQL local; testes normais não dependem de internet.
 
-## Fora do escopo atual
+## Fora do escopo
 
-Não há frontend, autenticação, múltiplos usuários, importação de notas, dividendos, imposto de renda, recomendações, execução real de ordens, Swagger/OpenAPI, paginação, dashboard, retry automático ou cache genérico.
+Importação de notas, dividendos, imposto de renda, recomendações, execução real de ordens, Swagger/OpenAPI, retry automático e cache genérico não fazem parte do produto atual.
 
-## Pendências acadêmicas
+## Ambiguidades acadêmicas
 
-O sistema usa identidade `(ticker, mercado)` e PostgreSQL em runtime com H2 em testes. As divergências/ambiguidades literais do enunciado sobre ticker e H2/MySQL/PostgreSQL permanecem pendentes de confirmação acadêmica.
+O sistema mantém a identidade `(ticker, mercado)`, PostgreSQL em runtime e H2 em testes, sem MySQL. Essas escolhas e a execução individual não representam aprovação do professor e permanecem sujeitas à orientação acadêmica.

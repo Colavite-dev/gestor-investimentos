@@ -1,0 +1,30 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "test": "npm run test:pricing",
+    "test:pricing": "node --test --experimental-strip-types tests/operation-pricing.test.ts tests/market-assets-ui.test.ts tests/stock-page.test.ts tests/stock-history.test.ts tests/auth-ui.test.ts tests/app-shell.test.ts tests/dashboard-charts.test.ts tests/investment-isolation-ui.test.ts tests/wallet-modal-ui.test.ts tests/broker-page.test.ts tests/api-client-status.test.ts tests/portfolio-quote-refresh-ui.test.ts",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "lucide-react": "^1.42.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.3",
+    "recharts": "^3.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2"
+  }
+}

@@ -1,5 +1,7 @@
 package com.colavite.gestor_investimento.controller;
 
+import org.springframework.security.test.context.support.WithMockUser;
+
 import com.colavite.gestor_investimento.entity.Acao;
 import com.colavite.gestor_investimento.entity.CotacaoHistorica;
 import com.colavite.gestor_investimento.entity.Mercado;
@@ -23,9 +25,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 @Transactional
+@WithMockUser
 class CotacaoHistoricaControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired AcaoRepository acoes;

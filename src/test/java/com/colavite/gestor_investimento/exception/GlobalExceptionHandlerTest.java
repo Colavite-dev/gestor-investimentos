@@ -79,4 +79,14 @@ class GlobalExceptionHandlerTest {
         assertThat(invalid.getBody().message()).doesNotContain("apikey", "token", "provider.test");
         assertThat(unavailable.getBody().message()).doesNotContain("apikey", "token", "provider.test");
     }
+
+    @Test
+    void deveRepresentarAmbiguidadeDeVenueComo422SemDeclararTickerInexistente() {
+        ResponseEntity<ApiErrorResponse> response = handler.handleStockVenueAmbiguity(
+                new StockVenueAmbiguityException(), request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        assertThat(response.getBody().message()).contains("múltiplos venues elegíveis")
+                .doesNotContain("não encontrado");
+    }
 }

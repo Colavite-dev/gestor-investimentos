@@ -2,12 +2,17 @@ package com.colavite.gestor_investimento.controller;
 
 import com.colavite.gestor_investimento.dto.AcaoRequest;
 import com.colavite.gestor_investimento.dto.AcaoResponse;
+import com.colavite.gestor_investimento.dto.AcaoResolveRequest;
+import com.colavite.gestor_investimento.dto.AcaoSuggestionResponse;
+import com.colavite.gestor_investimento.dto.AcaoCatalogPageResponse;
 import com.colavite.gestor_investimento.entity.Mercado;
 import com.colavite.gestor_investimento.service.AcaoService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -45,6 +50,29 @@ public class AcaoController {
     @GetMapping
     public ResponseEntity<List<AcaoResponse>> listar() {
         return ResponseEntity.ok(service.listar());
+    }
+
+    @GetMapping("/pesquisar")
+    public ResponseEntity<List<AcaoSuggestionResponse>> pesquisar(
+            @RequestParam @NotBlank @Size(min = 2, max = 20)
+            @Pattern(regexp = "[A-Za-z0-9 .-]+", message = "Termo de busca contém caracteres inválidos") String q
+    ) {
+        return ResponseEntity.ok(service.pesquisar(q));
+    }
+
+    @GetMapping("/catalogo")
+    public ResponseEntity<AcaoCatalogPageResponse> catalogar(
+            @RequestParam Mercado mercado,
+            @RequestParam(defaultValue = "") @Size(max = 100) String q,
+            @RequestParam(defaultValue = "0") @Min(0) @Max(10000) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size
+    ) {
+        return ResponseEntity.ok(service.catalogar(mercado, q, page, size));
+    }
+
+    @PostMapping("/resolver")
+    public ResponseEntity<AcaoResponse> resolver(@Valid @RequestBody AcaoResolveRequest request) {
+        return ResponseEntity.ok(service.resolver(request));
     }
 
     @GetMapping("/ticker/{ticker}")

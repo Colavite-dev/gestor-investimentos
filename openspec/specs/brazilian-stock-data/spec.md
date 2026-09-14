@@ -68,3 +68,40 @@ O sistema SHALL suportar token opcional de autenticação da fonte externa por c
 #### Scenario: Consulta com token configurado
 - **WHEN** há token configurado no ambiente
 - **THEN** o sistema envia a credencial exclusivamente no header de autorização da chamada externa
+
+
+### Requirement: Descoberta de sugestões brasileiras sem escrita
+Para uma pesquisa de ações, o sistema SHALL consultar a capacidade de busca da fonte brasileira para obter sugestões da B3 compatíveis com o termo informado. O sistema MUST filtrar e retornar somente ações brasileiras elegíveis ao domínio; fundos, ETFs, FIIs, BDRs, opções, futuros, criptomoedas, índices e resultados sem ticker válido MUST NOT ser apresentados como sugestões. A descoberta SHALL retornar somente dados de sugestão e MUST NOT cadastrar, alterar cotação nem criar histórico.
+
+#### Scenario: Busca parcial brasileira
+- **WHEN** o cliente pesquisa um prefixo ou nome compatível com ações brasileiras elegíveis
+- **THEN** o sistema retorna sugestões brasileiras com ticker, nome quando disponível, mercado Brasil e moeda BRL, sem escrita
+
+#### Scenario: Busca brasileira sem correspondência elegível
+- **WHEN** a fonte não retorna ação brasileira elegível para o termo
+- **THEN** o sistema contribui com nenhuma sugestão brasileira e não persiste ação
+
+### Requirement: Seleção brasileira mantém a identidade confirmada
+Após uma sugestão brasileira ser selecionada para resolução, o sistema SHALL aplicar integralmente as regras de ticker canônico já vigentes: ticker solicitado, `requestedSymbol` e `symbol` normalizados MUST coincidir e `changed` MUST ser `false`. A sugestão descoberta MUST NOT autorizar alias, renomeação ou substituição automática de ticker.
+
+#### Scenario: Sugestão brasileira divergente ao resolver
+- **WHEN** a resolução de sugestão brasileira informa símbolo diferente, `requestedSymbol` diferente ou `changed=true`
+- **THEN** o sistema responde `502 Bad Gateway` e não persiste ação
+### Requirement: Catálogo brasileiro usa a listagem paginada da brapi
+
+O sistema SHALL consultar a listagem oficial da brapi com `type=stock`, encaminhar busca e paginação suportadas e aceitar somente ações elegíveis do mercado brasileiro em BRL. SHALL mapear ticker, nome, cotação e logo quando os valores válidos estiverem presentes.
+
+#### Scenario: Página BR com enriquecimento nativo
+
+- **WHEN** a brapi retorna uma página válida contendo cotação e logo
+- **THEN** o sistema retorna esses dados na mesma página sem chamadas adicionais por símbolo
+
+#### Scenario: Paginação BR
+
+- **WHEN** a brapi informa metadados de página e de continuidade
+- **THEN** o sistema preserva metadados equivalentes para a navegação do cliente
+
+#### Scenario: Item não elegível
+
+- **WHEN** a resposta contém fundo, BDR ou item incompatível com ação brasileira em BRL
+- **THEN** o item não integra o catálogo de ações BR

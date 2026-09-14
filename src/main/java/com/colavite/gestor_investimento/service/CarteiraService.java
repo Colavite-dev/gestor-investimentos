@@ -5,6 +5,7 @@ import com.colavite.gestor_investimento.entity.Carteira;
 import com.colavite.gestor_investimento.exception.*;
 import com.colavite.gestor_investimento.mapper.CarteiraMapper;
 import com.colavite.gestor_investimento.repository.CarteiraRepository;
+import com.colavite.gestor_investimento.repository.UsuarioRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,17 +15,19 @@ import java.util.*;
 @Service
 public class CarteiraService {
     private final CarteiraRepository repository;
-    public CarteiraService(CarteiraRepository repository) { this.repository = repository; }
+    private final UsuarioRepository usuarios;
+    public CarteiraService(CarteiraRepository repository, UsuarioRepository usuarios) { this.repository = repository; this.usuarios = usuarios; }
     @Transactional
-    public CarteiraResponse cadastrar(CarteiraRequest request) {
+    public CarteiraResponse cadastrar(CarteiraRequest request, Long usuarioId) {
         String nome = request.nome().trim();
         String normalizado = normalizar(nome);
-        if (repository.existsByNomeNormalizado(normalizado)) throw new CarteiraDuplicadaException(nome);
-        try { return CarteiraMapper.toResponse(repository.saveAndFlush(new Carteira(nome, normalizado, optional(request.descricao())))); }
+        if (repository.existsByUsuarioIdAndNomeNormalizado(usuarioId, normalizado)) throw new CarteiraDuplicadaException(nome);
+        var usuario = usuarios.findById(usuarioId).orElseThrow(CredenciaisInvalidasException::new);
+        try { return CarteiraMapper.toResponse(repository.saveAndFlush(new Carteira(nome, normalizado, optional(request.descricao()), usuario))); }
         catch (DataIntegrityViolationException e) { throw new CarteiraDuplicadaException(nome); }
     }
-    @Transactional(readOnly = true) public List<CarteiraResponse> listar() { return repository.findAllByOrderByIdAsc().stream().map(CarteiraMapper::toResponse).toList(); }
-    @Transactional(readOnly = true) public CarteiraResponse buscarPorId(Long id) { return repository.findById(id).map(CarteiraMapper::toResponse).orElseThrow(() -> CarteiraNotFoundException.porId(id)); }
+    @Transactional(readOnly = true) public List<CarteiraResponse> listar(Long usuarioId) { return repository.findAllByUsuarioIdOrderByIdAsc(usuarioId).stream().map(CarteiraMapper::toResponse).toList(); }
+    @Transactional(readOnly = true) public CarteiraResponse buscarPorId(Long id, Long usuarioId) { return repository.findByIdAndUsuarioId(id, usuarioId).map(CarteiraMapper::toResponse).orElseThrow(() -> CarteiraNotFoundException.porId(id)); }
     private String optional(String value) { return value == null || value.isBlank() ? null : value.trim(); }
     private String normalizar(String value) { return Normalizer.normalize(value, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toUpperCase(Locale.ROOT); }
 }
