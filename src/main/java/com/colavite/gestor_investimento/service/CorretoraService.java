@@ -5,6 +5,7 @@ import com.colavite.gestor_investimento.dto.CorretoraResponse;
 import com.colavite.gestor_investimento.entity.Corretora;
 import com.colavite.gestor_investimento.exception.CnpjDuplicadoException;
 import com.colavite.gestor_investimento.exception.CorretoraNotFoundException;
+import com.colavite.gestor_investimento.exception.CredenciaisInvalidasException;
 import com.colavite.gestor_investimento.exception.CvmParticipantNotAcceptedException;
 import com.colavite.gestor_investimento.exception.InvalidCepResponseException;
 import com.colavite.gestor_investimento.integration.cep.CepAddressData;
@@ -16,6 +17,7 @@ import com.colavite.gestor_investimento.integration.cvm.CvmParticipantEligibilit
 import com.colavite.gestor_investimento.integration.cvm.CvmParticipantProvider;
 import com.colavite.gestor_investimento.mapper.CorretoraMapper;
 import com.colavite.gestor_investimento.repository.CorretoraRepository;
+import com.colavite.gestor_investimento.repository.UsuarioRepository;
 import com.colavite.gestor_investimento.validation.CnpjUtils;
 import com.colavite.gestor_investimento.validation.CepUtils;
 import org.springframework.stereotype.Service;
@@ -31,20 +33,22 @@ public class CorretoraService {
     private final CepDataProvider cepDataProvider;
     private final CvmParticipantProvider cvmParticipantProvider;
     private final CorretoraPersistenceService persistenceService;
+    private final UsuarioRepository usuarios;
 
     public CorretoraService(CorretoraRepository repository, CnpjDataProvider cnpjDataProvider,
                             CepDataProvider cepDataProvider, CvmParticipantProvider cvmParticipantProvider,
-                            CorretoraPersistenceService persistenceService) {
+                            CorretoraPersistenceService persistenceService, UsuarioRepository usuarios) {
         this.repository = repository;
         this.cnpjDataProvider = cnpjDataProvider;
         this.cepDataProvider = cepDataProvider;
         this.cvmParticipantProvider = cvmParticipantProvider;
         this.persistenceService = persistenceService;
+        this.usuarios = usuarios;
     }
 
-    public CorretoraResponse cadastrar(CorretoraRequest request) {
+    public CorretoraResponse cadastrar(CorretoraRequest request, Long usuarioId) {
         String cnpj = CnpjUtils.somenteDigitos(request.cnpj());
-        if (repository.existsByCnpj(cnpj)) {
+        if (repository.existsByUsuarioIdAndCnpj(usuarioId, cnpj)) {
             throw new CnpjDuplicadoException(cnpj);
         }
 
@@ -61,7 +65,8 @@ public class CorretoraService {
         if (!isAcceptedByCvm(cvmParticipant)) {
             throw new CvmParticipantNotAcceptedException();
         }
-        Corretora corretora = CorretoraMapper.toEntity(reconciliarEndereco(registrationData, cepData));
+        var usuario = usuarios.findById(usuarioId).orElseThrow(CredenciaisInvalidasException::new);
+        Corretora corretora = CorretoraMapper.toEntity(reconciliarEndereco(registrationData, cepData), usuario);
         corretora.marcarValidadaNaCvm();
 
         return CorretoraMapper.toResponse(persistenceService.persistir(corretora));
@@ -92,23 +97,23 @@ public class CorretoraService {
     }
 
     @Transactional(readOnly = true)
-    public List<CorretoraResponse> listar() {
-        return repository.findAllByOrderByIdAsc().stream()
+    public List<CorretoraResponse> listar(Long usuarioId) {
+        return repository.findAllByUsuarioIdOrderByIdAsc(usuarioId).stream()
                 .map(CorretoraMapper::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public CorretoraResponse buscarPorId(Long id) {
-        return repository.findById(id)
+    public CorretoraResponse buscarPorId(Long id, Long usuarioId) {
+        return repository.findByIdAndUsuarioId(id, usuarioId)
                 .map(CorretoraMapper::toResponse)
                 .orElseThrow(() -> CorretoraNotFoundException.porId(id));
     }
 
     @Transactional(readOnly = true)
-    public CorretoraResponse buscarPorCnpj(String cnpj) {
+    public CorretoraResponse buscarPorCnpj(String cnpj, Long usuarioId) {
         String normalizado = CnpjUtils.somenteDigitos(cnpj);
-        return repository.findByCnpj(normalizado)
+        return repository.findByUsuarioIdAndCnpj(usuarioId, normalizado)
                 .map(CorretoraMapper::toResponse)
                 .orElseThrow(() -> CorretoraNotFoundException.porCnpj(normalizado));
     }

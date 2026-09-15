@@ -3,11 +3,13 @@ package com.colavite.gestor_investimento.controller;
 import com.colavite.gestor_investimento.dto.CorretoraRequest;
 import com.colavite.gestor_investimento.dto.CorretoraResponse;
 import com.colavite.gestor_investimento.service.CorretoraService;
+import com.colavite.gestor_investimento.security.AuthenticatedUserId;
 import com.colavite.gestor_investimento.validation.ValidCnpj;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,8 +34,8 @@ public class CorretoraController {
     }
 
     @PostMapping
-    public ResponseEntity<CorretoraResponse> cadastrar(@Valid @RequestBody CorretoraRequest request) {
-        CorretoraResponse response = service.cadastrar(request);
+    public ResponseEntity<CorretoraResponse> cadastrar(@Valid @RequestBody CorretoraRequest request, Authentication authentication) {
+        CorretoraResponse response = service.cadastrar(request, AuthenticatedUserId.from(authentication));
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}")
                 .buildAndExpand(response.id())
@@ -42,15 +44,16 @@ public class CorretoraController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CorretoraResponse>> listar() {
-        return ResponseEntity.ok(service.listar());
+    public ResponseEntity<List<CorretoraResponse>> listar(Authentication authentication) {
+        return ResponseEntity.ok(service.listar(AuthenticatedUserId.from(authentication)));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<CorretoraResponse> buscarPorId(
-            @PathVariable @Positive(message = "ID deve ser maior que zero") Long id
+            @PathVariable @Positive(message = "ID deve ser maior que zero") Long id,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(service.buscarPorId(id));
+        return ResponseEntity.ok(service.buscarPorId(id, AuthenticatedUserId.from(authentication)));
     }
 
     @GetMapping("/cnpj/{cnpj}")
@@ -58,8 +61,9 @@ public class CorretoraController {
             @PathVariable
             @Pattern(regexp = "\\d{14}", message = "CNPJ no path deve conter 14 dígitos")
             @ValidCnpj
-            String cnpj
+            String cnpj,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(service.buscarPorCnpj(cnpj));
+        return ResponseEntity.ok(service.buscarPorCnpj(cnpj, AuthenticatedUserId.from(authentication)));
     }
 }

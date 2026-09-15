@@ -15,7 +15,7 @@ import java.util.Locale;
 public class CorretoraPersistenceService {
 
     private static final String DUPLICATE_KEY_SQL_STATE = "23505";
-    private static final String CNPJ_UNIQUE_CONSTRAINT = "UK_CORRETORAS_CNPJ";
+    private static final String CNPJ_UNIQUE_CONSTRAINT = "UK_CORRETORAS_USUARIO_CNPJ";
 
     private final CorretoraRepository repository;
 
@@ -41,7 +41,7 @@ public class CorretoraPersistenceService {
             return isCnpjConstraint(constraintViolation.getConstraintName())
                     && hasSqlState(exception, DUPLICATE_KEY_SQL_STATE);
         }
-        return hasSqlState(exception, DUPLICATE_KEY_SQL_STATE);
+        return false;
     }
 
     private boolean isCnpjConstraint(String constraintName) {

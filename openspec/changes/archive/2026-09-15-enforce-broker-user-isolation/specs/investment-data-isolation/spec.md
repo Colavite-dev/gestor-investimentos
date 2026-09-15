@@ -1,10 +1,4 @@
-# investment-data-isolation Specification
-
-## Purpose
-
-Garantir que patrimônio e fatos financeiros privados sejam acessíveis somente pelo proprietário autenticado, preservando dados mestres de mercado como recursos compartilhados.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Propriedade privada deriva da identidade autenticada
 Cada carteira e cada corretora cadastrada SHALL pertencer a exatamente um usuário e o backend SHALL determinar esse owner pelo ID estável presente na identidade autenticada. Requests de carteira, operação e corretora MUST NOT aceitar `usuarioId`, owner ou username como fonte de autorização.
@@ -57,24 +51,6 @@ Consulta ou mutação de carteira, operação e corretora SHALL ser limitada por
 
 - **WHEN** USER_B solicita `GET /corretoras/{id}` ou `GET /corretoras/cnpj/{cnpj}` para uma corretora pertencente a USER_A
 - **THEN** a API retorna `404 Not Found` sem dados da corretora e sem indicar que pertence a USER_A
-
-### Requirement: Papel administrativo não concede ownership financeiro implícito
-
-O papel `ADMIN` SHALL continuar autorizando somente os recursos administrativos já especificados e MUST NOT conceder acesso automático às carteiras, operações, posições ou resumos de outros usuários pelos endpoints comuns de investimento.
-
-#### Scenario: ADMIN tenta acessar carteira alheia
-
-- **WHEN** um ADMIN autenticado solicita por ID uma carteira pertencente a outro usuário
-- **THEN** a API aplica a mesma política de owner e retorna `404 Not Found`
-
-### Requirement: Dados de mercado permanecem globais
-
-`Acao`, catálogo, cotação atual e histórico de cotação SHALL permanecer globais e compartilháveis. Compartilhar a mesma `Acao` entre usuários MUST NOT compartilhar carteiras, operações, quantidades, custos, posições, resumos ou valuation.
-
-#### Scenario: Dois usuários utilizam PETR3
-
-- **WHEN** USER_A e USER_B registram compras da mesma `Acao` PETR3 em suas próprias carteiras
-- **THEN** ambos referenciam o mesmo ativo mestre e obtêm operações, quantidades, custos médios e valuation calculados independentemente
 
 ### Requirement: Migration não atribui nem remove legado automaticamente
 

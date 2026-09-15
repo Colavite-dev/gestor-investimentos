@@ -8,9 +8,11 @@ import java.util.Optional;
 
 public interface CorretoraRepository extends JpaRepository<Corretora, Long> {
 
-    boolean existsByCnpj(String cnpj);
+    boolean existsByUsuarioIdAndCnpj(Long usuarioId, String cnpj);
 
-    Optional<Corretora> findByCnpj(String cnpj);
+    Optional<Corretora> findByIdAndUsuarioId(Long id, Long usuarioId);
 
-    List<Corretora> findAllByOrderByIdAsc();
+    Optional<Corretora> findByUsuarioIdAndCnpj(Long usuarioId, String cnpj);
+
+    List<Corretora> findAllByUsuarioIdOrderByIdAsc(Long usuarioId);
 }

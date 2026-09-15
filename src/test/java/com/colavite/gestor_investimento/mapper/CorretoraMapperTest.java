@@ -3,6 +3,7 @@ package com.colavite.gestor_investimento.mapper;
 import com.colavite.gestor_investimento.dto.CorretoraResponse;
 import com.colavite.gestor_investimento.entity.Corretora;
 import com.colavite.gestor_investimento.integration.cnpj.CnpjRegistrationData;
+import com.colavite.gestor_investimento.support.TestUsuarios;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,7 +28,7 @@ class CorretoraMapperTest {
                 " ATIVA "
         );
 
-        Corretora entity = CorretoraMapper.toEntity(data);
+        Corretora entity = CorretoraMapper.toEntity(data, TestUsuarios.novo("broker-mapper"));
         CorretoraResponse response = CorretoraMapper.toResponse(entity);
 
         assertThat(response.cnpj()).isEqualTo("11222333000181");

@@ -5,17 +5,16 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 
 import java.time.Instant;
 
 @Entity
-@Table(
-        name = "corretoras",
-        uniqueConstraints = @UniqueConstraint(name = "uk_corretoras_cnpj", columnNames = "cnpj")
-)
+@Table(name = "corretoras")
 public class Corretora {
 
     @Id
@@ -67,6 +66,10 @@ public class Corretora {
     @Column(name = "data_cadastro", nullable = false)
     private Instant dataCadastro;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "usuario_id", nullable = false)
+    private Usuario usuario;
+
     protected Corretora() {
     }
 
@@ -83,7 +86,8 @@ public class Corretora {
             String bairro,
             String cidade,
             String uf,
-            String situacaoCadastral
+            String situacaoCadastral,
+            Usuario usuario
     ) {
         this.cnpj = cnpj;
         this.razaoSocial = razaoSocial;
@@ -98,6 +102,7 @@ public class Corretora {
         this.cidade = cidade;
         this.uf = uf;
         this.situacaoCadastral = situacaoCadastral;
+        this.usuario = usuario;
         this.validadaNaCvm = false;
         this.dataCadastro = Instant.now();
     }
@@ -175,5 +180,9 @@ public class Corretora {
 
     public Instant getDataCadastro() {
         return dataCadastro;
+    }
+
+    public Usuario getUsuario() {
+        return usuario;
     }
 }

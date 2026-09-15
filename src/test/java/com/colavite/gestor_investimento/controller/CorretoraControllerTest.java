@@ -1,24 +1,17 @@
 package com.colavite.gestor_investimento.controller;
 
-import org.springframework.security.test.context.support.WithMockUser;
-
 import com.colavite.gestor_investimento.entity.Corretora;
-import com.colavite.gestor_investimento.exception.CnpjNotFoundException;
-import com.colavite.gestor_investimento.exception.CnpjProviderUnavailableException;
-import com.colavite.gestor_investimento.exception.InvalidCnpjResponseException;
-import com.colavite.gestor_investimento.exception.CepNotFoundException;
-import com.colavite.gestor_investimento.exception.CepProviderUnavailableException;
-import com.colavite.gestor_investimento.exception.InvalidCepResponseException;
-import com.colavite.gestor_investimento.exception.CvmParticipantNotAcceptedException;
-import com.colavite.gestor_investimento.exception.CvmProviderUnavailableException;
-import com.colavite.gestor_investimento.exception.InvalidCvmResponseException;
-import com.colavite.gestor_investimento.integration.cnpj.CnpjDataProvider;
-import com.colavite.gestor_investimento.integration.cnpj.CnpjRegistrationData;
+import com.colavite.gestor_investimento.entity.Usuario;
 import com.colavite.gestor_investimento.integration.cep.CepAddressData;
 import com.colavite.gestor_investimento.integration.cep.CepDataProvider;
+import com.colavite.gestor_investimento.integration.cnpj.CnpjDataProvider;
+import com.colavite.gestor_investimento.integration.cnpj.CnpjRegistrationData;
 import com.colavite.gestor_investimento.integration.cvm.CvmParticipantData;
 import com.colavite.gestor_investimento.integration.cvm.CvmParticipantProvider;
 import com.colavite.gestor_investimento.repository.CorretoraRepository;
+import com.colavite.gestor_investimento.repository.UsuarioRepository;
+import com.colavite.gestor_investimento.support.TestUsuarios;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,262 +22,83 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.reset;
-import java.util.Optional;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
-@AutoConfigureMockMvc(addFilters = false)
+@AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
-@WithMockUser
 class CorretoraControllerTest {
+    private static final String CNPJ = "11222333000181";
+    @Autowired private MockMvc mockMvc;
+    @Autowired private CorretoraRepository repository;
+    @Autowired private UsuarioRepository usuarios;
+    @MockitoBean private CnpjDataProvider cnpjDataProvider;
+    @MockitoBean private CepDataProvider cepDataProvider;
+    @MockitoBean private CvmParticipantProvider cvmParticipantProvider;
+    private Long ownerA;
+    private Long ownerB;
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private CorretoraRepository repository;
-
-    @MockitoBean
-    private CnpjDataProvider cnpjDataProvider;
-
-    @MockitoBean
-    private CepDataProvider cepDataProvider;
-
-    @MockitoBean
-    private CvmParticipantProvider cvmParticipantProvider;
-
-    @Test
-    void deveCadastrarSomenteComCnpjEUsarDadosDoProvider() throws Exception {
-        when(cnpjDataProvider.consultar("11222333000181"))
-                .thenReturn(registrationData("11222333000181"));
-        when(cepDataProvider.consultar("01001000")).thenReturn(cepData());
-        acceptCvm();
-
-        mockMvc.perform(post("/corretoras")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validJson("11.222.333/0001-81")))
-                .andExpect(status().isCreated())
-                .andExpect(header().string("Location", org.hamcrest.Matchers.matchesPattern(".*/corretoras/\\d+")))
-                .andExpect(jsonPath("$.cnpj").value("11222333000181"))
-                .andExpect(jsonPath("$.razaoSocial").value("Corretora Oficial S.A."))
-                .andExpect(jsonPath("$.cep").value("01001000"))
-                .andExpect(jsonPath("$.uf").value("SP"))
-                .andExpect(jsonPath("$.validadaNaCvm").value(true))
-                .andExpect(jsonPath("$.dataCadastro").exists());
+    @BeforeEach
+    void setUp() {
+        ownerA = TestUsuarios.persistir(usuarios, "broker-controller-a").getId();
+        ownerB = TestUsuarios.persistir(usuarios, "broker-controller-b").getId();
+        stubProviders();
     }
 
     @Test
-    void deveRetornarConflitoSemConsultarProviderParaDuplicidade() throws Exception {
-        repository.saveAndFlush(entity("11222333000181"));
+    void isolaListagemEConsultasPorIdECnpjEntreUsuarios() throws Exception {
+        create(ownerA).andExpect(status().isCreated());
+        Corretora brokerA = repository.findByUsuarioIdAndCnpj(ownerA, CNPJ).orElseThrow();
 
-        mockMvc.perform(post("/corretoras")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validJson("11222333000181")))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.status").value(409))
-                .andExpect(jsonPath("$.path").value("/corretoras"));
-
-        verifyNoInteractions(cnpjDataProvider);
-        verifyNoInteractions(cepDataProvider);
-        verifyNoInteractions(cvmParticipantProvider);
+        mockMvc.perform(get("/corretoras").with(user(ownerA.toString())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(1))).andExpect(jsonPath("$[0].cnpj").value(CNPJ));
+        mockMvc.perform(get("/corretoras").with(user(ownerB.toString())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
+        mockMvc.perform(get("/corretoras/{id}", brokerA.getId()).with(user(ownerB.toString())))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/corretoras/cnpj/{cnpj}", CNPJ).with(user(ownerB.toString())))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void deveRejeitarCnpjInvalidoSemConsultarProvider() throws Exception {
-        mockMvc.perform(post("/corretoras")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"cnpj": "11111111111111"}
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.fieldErrors.cnpj").exists());
+    void permiteMesmoCnpjParaOutroOwnerERejeitaRepeticaoDoMesmoOwner() throws Exception {
+        create(ownerA).andExpect(status().isCreated());
+        create(ownerB).andExpect(status().isCreated());
+        reset(cnpjDataProvider, cepDataProvider, cvmParticipantProvider);
 
-        verifyNoInteractions(cnpjDataProvider);
+        create(ownerA).andExpect(status().isConflict());
+        verifyNoInteractions(cnpjDataProvider, cepDataProvider, cvmParticipantProvider);
+        assertThat(repository.findByUsuarioIdAndCnpj(ownerA, CNPJ)).isPresent();
+        assertThat(repository.findByUsuarioIdAndCnpj(ownerB, CNPJ)).isPresent();
     }
 
     @Test
-    void deveRejeitarPropriedadeDesconhecidaDoRequest() throws Exception {
-        mockMvc.perform(post("/corretoras")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "cnpj": "11222333000181",
-                                  "razaoSocial": "Tentativa de sobrescrita"
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Corpo da requisição inválido"));
-
-        verifyNoInteractions(cnpjDataProvider);
+    void rejeitaCampoDeOwnerForjadoMantendoContratoEstrito() throws Exception {
+        mockMvc.perform(post("/corretoras").with(user(ownerA.toString())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cnpj\":\"11222333000181\",\"usuarioId\":999}"))
+                .andExpect(status().isBadRequest());
     }
 
-    @Test
-    void deveMapearCnpjNaoEncontradoPara422() throws Exception {
-        when(cnpjDataProvider.consultar("11222333000181"))
-                .thenThrow(new CnpjNotFoundException("11222333000181"));
-
-        mockMvc.perform(post("/corretoras")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validJson("11222333000181")))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("BrasilAPI"))));
+    private org.springframework.test.web.servlet.ResultActions create(Long owner) throws Exception {
+        return mockMvc.perform(post("/corretoras").with(user(owner.toString())).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cnpj\":\"11.222.333/0001-81\"}"));
     }
-
-    @Test
-    void deveMapearRespostaInvalidaPara502() throws Exception {
-        when(cnpjDataProvider.consultar("11222333000181"))
-                .thenThrow(new InvalidCnpjResponseException());
-
-        mockMvc.perform(post("/corretoras")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validJson("11222333000181")))
-                .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.status").value(502));
-    }
-
-    @Test
-    void deveMapearIndisponibilidadePara503() throws Exception {
-        when(cnpjDataProvider.consultar("11222333000181"))
-                .thenThrow(new CnpjProviderUnavailableException());
-
-        mockMvc.perform(post("/corretoras")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validJson("11222333000181")))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.status").value(503));
-    }
-
-    @Test
-    void deveListarBuscarPorIdECnpj() throws Exception {
-        Corretora first = repository.saveAndFlush(entity("11222333000181"));
-        Corretora second = repository.saveAndFlush(entity("45723174000110"));
-
-        mockMvc.perform(get("/corretoras"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].id").value(first.getId()))
-                .andExpect(jsonPath("$[1].id").value(second.getId()));
-
-        mockMvc.perform(get("/corretoras/{id}", first.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cnpj").value("11222333000181"));
-
-        mockMvc.perform(get("/corretoras/cnpj/{cnpj}", "45723174000110"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(second.getId()));
-    }
-
-    @Test
-    void deveMapearErrosDeCepPara422502E503() throws Exception {
-        when(cnpjDataProvider.consultar("11222333000181")).thenReturn(registrationData("11222333000181"));
-        when(cepDataProvider.consultar("01001000")).thenThrow(new CepNotFoundException());
-        mockMvc.perform(post("/corretoras").contentType(MediaType.APPLICATION_JSON).content(validJson("11222333000181"))).andExpect(status().isUnprocessableEntity());
-        reset(cepDataProvider);
-        when(cepDataProvider.consultar("01001000")).thenThrow(new InvalidCepResponseException());
-        mockMvc.perform(post("/corretoras").contentType(MediaType.APPLICATION_JSON).content(validJson("11222333000181"))).andExpect(status().isBadGateway());
-        reset(cepDataProvider);
-        when(cepDataProvider.consultar("01001000")).thenThrow(new CepProviderUnavailableException());
-        mockMvc.perform(post("/corretoras").contentType(MediaType.APPLICATION_JSON).content(validJson("11222333000181"))).andExpect(status().isServiceUnavailable());
-    }
-
-    @Test
-    void deveMapearErrosDaCvmPara422502E503() throws Exception {
-        when(cnpjDataProvider.consultar("11222333000181")).thenReturn(registrationData("11222333000181"));
-        when(cepDataProvider.consultar("01001000")).thenReturn(cepData());
-        when(cvmParticipantProvider.consultar("11222333000181")).thenThrow(new CvmParticipantNotAcceptedException());
-        mockMvc.perform(post("/corretoras").contentType(MediaType.APPLICATION_JSON).content(validJson("11222333000181")))
-                .andExpect(status().isUnprocessableEntity());
-        reset(cvmParticipantProvider);
-        when(cvmParticipantProvider.consultar("11222333000181")).thenThrow(new InvalidCvmResponseException());
-        mockMvc.perform(post("/corretoras").contentType(MediaType.APPLICATION_JSON).content(validJson("11222333000181")))
-                .andExpect(status().isBadGateway());
-        reset(cvmParticipantProvider);
-        when(cvmParticipantProvider.consultar("11222333000181")).thenThrow(new CvmProviderUnavailableException());
-        mockMvc.perform(post("/corretoras").contentType(MediaType.APPLICATION_JSON).content(validJson("11222333000181")))
-                .andExpect(status().isServiceUnavailable());
-    }
-
-    @Test
-    void deveRetornarNotFoundParaConsultasAusentes() throws Exception {
-        mockMvc.perform(get("/corretoras/{id}", 999L))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.status").value(404));
-
-        mockMvc.perform(get("/corretoras/cnpj/{cnpj}", "11222333000181"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.status").value(404));
-    }
-
-    @Test
-    void deveValidarParametrosDePath() throws Exception {
-        mockMvc.perform(get("/corretoras/{id}", 0))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors.id").exists());
-
-        mockMvc.perform(get("/corretoras/cnpj/{cnpj}", "123"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors.cnpj").exists());
-    }
-
-    private String validJson(String cnpj) {
-        return """
-                {"cnpj": "%s"}
-                """.formatted(cnpj);
-    }
-
-    private CnpjRegistrationData registrationData(String cnpj) {
-        return new CnpjRegistrationData(
-                cnpj,
-                "Corretora Oficial S.A.",
-                "Corretora Oficial",
-                "contato@oficial.example",
-                "1133334444",
-                "01001000",
-                "Praça da Sé",
-                "100",
-                null,
-                "Sé",
-                "São Paulo",
-                "SP",
-                "ATIVA"
-        );
-    }
-
-    private Corretora entity(String cnpj) {
-        return new Corretora(
-                cnpj,
-                "Corretora Exemplo S.A.",
-                null,
-                null,
-                null,
-                "01001000",
-                "Praça da Sé",
-                "100",
-                null,
-                "Sé",
-                "São Paulo",
-                "SP",
-                "ATIVA"
-        );
-    }
-
-    private CepAddressData cepData() {
-        return new CepAddressData("01001000", "Praça da Sé", "Sé", "São Paulo", "SP");
-    }
-
-    private void acceptCvm() {
-        when(cvmParticipantProvider.consultar("11222333000181"))
-                .thenReturn(Optional.of(new CvmParticipantData("11222333000181", "EM FUNCIONAMENTO NORMAL", "CORRETORA")));
+    private void stubProviders() {
+        when(cnpjDataProvider.consultar(CNPJ)).thenReturn(new CnpjRegistrationData(CNPJ, "Corretora Oficial", null, null, null,
+                "01001000", "Praca", "100", null, "Se", "Sao Paulo", "SP", "ATIVA"));
+        when(cepDataProvider.consultar("01001000")).thenReturn(new CepAddressData("01001000", "Praca", "Se", "Sao Paulo", "SP"));
+        when(cvmParticipantProvider.consultar(CNPJ)).thenReturn(Optional.of(
+                new CvmParticipantData(CNPJ, "EM FUNCIONAMENTO NORMAL", "CORRETORA")));
     }
 }

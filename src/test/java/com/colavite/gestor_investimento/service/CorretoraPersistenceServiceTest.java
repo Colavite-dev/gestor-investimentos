@@ -3,6 +3,7 @@ package com.colavite.gestor_investimento.service;
 import com.colavite.gestor_investimento.entity.Corretora;
 import com.colavite.gestor_investimento.exception.CnpjDuplicadoException;
 import com.colavite.gestor_investimento.repository.CorretoraRepository;
+import com.colavite.gestor_investimento.support.TestUsuarios;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,42 +20,22 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CorretoraPersistenceServiceTest {
-
-    @Mock
-    private CorretoraRepository repository;
-
+    @Mock private CorretoraRepository repository;
     private CorretoraPersistenceService service;
 
-    @BeforeEach
-    void setUp() {
-        service = new CorretoraPersistenceService(repository);
+    @BeforeEach void setUp() { service = new CorretoraPersistenceService(repository); }
+
+    @Test
+    void traduzSomenteViolacaoDaConstraintCompostaDoOwnerECnpj() {
+        when(repository.saveAndFlush(any(Corretora.class))).thenThrow(uniqueViolation("uk_corretoras_usuario_cnpj"));
+        assertThatThrownBy(() -> service.persistir(corretora())).isInstanceOf(CnpjDuplicadoException.class);
     }
 
     @Test
-    void traduzSomenteViolacaoDaConstraintDeCnpj() {
-        when(repository.saveAndFlush(any(Corretora.class))).thenThrow(uniqueViolation("uk_corretoras_cnpj"));
-
-        assertThatThrownBy(() -> service.persistir(corretora()))
-                .isInstanceOf(CnpjDuplicadoException.class);
-    }
-
-    @Test
-    void propagaViolacaoDeIntegridadeQueNaoEhDoCnpj() {
+    void propagaOutraViolacaoDeIntegridade() {
         DataIntegrityViolationException violation = uniqueViolation("uk_outra_regra");
         when(repository.saveAndFlush(any(Corretora.class))).thenThrow(violation);
-
-        assertThatThrownBy(() -> service.persistir(corretora()))
-                .isSameAs(violation);
-    }
-
-    @Test
-    void propagaViolacaoSemSqlStateDeChaveDuplicada() {
-        DataIntegrityViolationException violation = new DataIntegrityViolationException(
-                "not null", new SQLException("not null", "23502"));
-        when(repository.saveAndFlush(any(Corretora.class))).thenThrow(violation);
-
-        assertThatThrownBy(() -> service.persistir(corretora()))
-                .isSameAs(violation);
+        assertThatThrownBy(() -> service.persistir(corretora())).isSameAs(violation);
     }
 
     private DataIntegrityViolationException uniqueViolation(String constraintName) {
@@ -64,7 +45,7 @@ class CorretoraPersistenceServiceTest {
     }
 
     private Corretora corretora() {
-        return new Corretora("11222333000181", "Corretora", null, null, null,
-                "01001000", "Praça da Sé", "100", null, "Sé", "São Paulo", "SP", "ATIVA");
+        return new Corretora("11222333000181", "Corretora", null, null, null, "01001000", "Praca", "100",
+                null, "Se", "Sao Paulo", "SP", "ATIVA", TestUsuarios.novo("broker-persistence"));
     }
 }

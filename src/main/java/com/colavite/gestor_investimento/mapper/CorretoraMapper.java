@@ -2,6 +2,7 @@ package com.colavite.gestor_investimento.mapper;
 
 import com.colavite.gestor_investimento.dto.CorretoraResponse;
 import com.colavite.gestor_investimento.entity.Corretora;
+import com.colavite.gestor_investimento.entity.Usuario;
 import com.colavite.gestor_investimento.integration.cnpj.CnpjRegistrationData;
 import com.colavite.gestor_investimento.validation.CnpjUtils;
 
@@ -12,7 +13,7 @@ public final class CorretoraMapper {
     private CorretoraMapper() {
     }
 
-    public static Corretora toEntity(CnpjRegistrationData data) {
+    public static Corretora toEntity(CnpjRegistrationData data, Usuario usuario) {
         return new Corretora(
                 CnpjUtils.somenteDigitos(data.cnpj()),
                 data.razaoSocial().trim(),
@@ -26,7 +27,8 @@ public final class CorretoraMapper {
                 data.bairro().trim(),
                 data.cidade().trim(),
                 data.uf().trim().toUpperCase(Locale.ROOT),
-                data.situacaoCadastral().trim()
+                data.situacaoCadastral().trim(),
+                usuario
         );
     }
 
