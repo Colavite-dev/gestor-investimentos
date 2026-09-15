@@ -65,7 +65,7 @@ class CorretoraConcurrentRegistrationIntegrationTest {
         });
         when(cepDataProvider.consultar("01001000")).thenReturn(cepData());
         when(cvmParticipantProvider.consultar(CNPJ))
-                .thenReturn(Optional.of(new CvmParticipantData(CNPJ, "ATIVO", "CORRETORA")));
+                .thenReturn(Optional.of(new CvmParticipantData(CNPJ, "EM FUNCIONAMENTO NORMAL", "CORRETORA")));
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {

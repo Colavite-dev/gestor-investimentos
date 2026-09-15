@@ -58,7 +58,7 @@ class CorretoraServiceTest {
     void setUp() {
         service = new CorretoraService(repository, cnpjDataProvider, cepDataProvider, cvmParticipantProvider, persistenceService);
         lenient().when(cvmParticipantProvider.consultar("11222333000181"))
-                .thenReturn(Optional.of(new CvmParticipantData("11222333000181", "ATIVO", "CORRETORA DE TITULOS E VALORES MOBILIARIOS")));
+                .thenReturn(Optional.of(new CvmParticipantData("11222333000181", "EM FUNCIONAMENTO NORMAL", "CORRETORA DE TITULOS E VALORES MOBILIARIOS")));
     }
 
     @Test
@@ -176,7 +176,7 @@ class CorretoraServiceTest {
         assertThatThrownBy(() -> service.cadastrar(request("11222333000181")))
                 .isInstanceOf(CvmParticipantNotAcceptedException.class);
         when(cvmParticipantProvider.consultar("11222333000181"))
-                .thenReturn(Optional.of(new CvmParticipantData("11222333000181", "ATIVO", "BANCO COMERCIAL")));
+                .thenReturn(Optional.of(new CvmParticipantData("11222333000181", "EM FUNCIONAMENTO NORMAL", "BANCO COMERCIAL")));
         assertThatThrownBy(() -> service.cadastrar(request("11222333000181")))
                 .isInstanceOf(CvmParticipantNotAcceptedException.class);
         verify(persistenceService, never()).persistir(any(Corretora.class));
@@ -188,7 +188,7 @@ class CorretoraServiceTest {
         when(cnpjDataProvider.consultar("11222333000181")).thenReturn(registrationData("11222333000181"));
         when(cepDataProvider.consultar("01001000")).thenReturn(cepData());
         when(cvmParticipantProvider.consultar("11222333000181"))
-                .thenReturn(Optional.of(new CvmParticipantData("11222333000181", "ATIVO", "DISTRIBUIDORA DE TITULOS E VALORES MOBILIARIOS")));
+                .thenReturn(Optional.of(new CvmParticipantData("11222333000181", "EM FUNCIONAMENTO NORMAL", "DISTRIBUIDORA DE TITULOS E VALORES MOBILIARIOS")));
         when(persistenceService.persistir(any(Corretora.class))).thenAnswer(i -> i.getArgument(0));
 
         assertThat(service.cadastrar(request("11222333000181")).validadaNaCvm()).isTrue();

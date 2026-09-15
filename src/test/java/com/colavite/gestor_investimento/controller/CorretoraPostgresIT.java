@@ -58,8 +58,8 @@ class CorretoraPostgresIT {
     @BeforeEach
     void setUpProviders() {
         when(cepDataProvider.consultar("01001000")).thenReturn(cepData());
-        when(cvmParticipantProvider.consultar(COMMIT_CNPJ)).thenReturn(Optional.of(new CvmParticipantData(COMMIT_CNPJ, "ATIVO", "CORRETORA")));
-        when(cvmParticipantProvider.consultar(ROLLBACK_CNPJ)).thenReturn(Optional.of(new CvmParticipantData(ROLLBACK_CNPJ, "ATIVO", "CORRETORA")));
+        when(cvmParticipantProvider.consultar(COMMIT_CNPJ)).thenReturn(Optional.of(new CvmParticipantData(COMMIT_CNPJ, "EM FUNCIONAMENTO NORMAL", "CORRETORA")));
+        when(cvmParticipantProvider.consultar(ROLLBACK_CNPJ)).thenReturn(Optional.of(new CvmParticipantData(ROLLBACK_CNPJ, "EM FUNCIONAMENTO NORMAL", "CORRETORA")));
     }
 
     @AfterEach

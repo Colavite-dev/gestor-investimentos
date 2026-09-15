@@ -27,6 +27,8 @@ class CvmParticipantRealIT {
                         Duration.ofSeconds(5), Duration.ofSeconds(20), Duration.ofHours(24)),
                 Clock.systemUTC());
 
-        assertThat(adapter.consultar("02332886000104")).isPresent();
+        CvmParticipantData participant = adapter.consultar("02332886000104").orElseThrow();
+
+        assertThat(CvmParticipantEligibility.isEligible(participant)).isTrue();
     }
 }

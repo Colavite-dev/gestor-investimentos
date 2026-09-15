@@ -5,12 +5,14 @@ import java.util.Locale;
 
 public final class CvmParticipantEligibility {
 
+    private static final String ACTIVE_STATUS = "EM FUNCIONAMENTO NORMAL";
+
     private CvmParticipantEligibility() {
     }
 
     public static boolean isEligible(CvmParticipantData participant) {
         return participant != null
-                && "ATIVO".equals(normalize(participant.situacaoRegistro()))
+                && ACTIVE_STATUS.equals(normalize(participant.situacaoRegistro()))
                 && (normalize(participant.categoria()).contains("CORRETORA")
                 || normalize(participant.categoria()).contains("DISTRIBUIDORA"));
     }

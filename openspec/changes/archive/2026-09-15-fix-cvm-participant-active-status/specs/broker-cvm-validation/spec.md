@@ -1,21 +1,4 @@
-# Broker CVM Validation Specification
-
-## Purpose
-
-Validar uma corretora no cadastro oficial diário de Participantes Intermediários da CVM antes que ela seja persistida como instituição apta no sistema.
-
-## Requirements
-
-### Requirement: Validação no cadastro oficial de participantes intermediários
-Antes de persistir uma corretora, o sistema SHALL consultar os dados cadastrais oficiais mais recentes disponíveis no dataset diário **Participantes Intermediários: Informação Cadastral** da CVM. A consulta SHALL comparar o CNPJ normalizado para 14 dígitos e SHALL permanecer independente do formato ZIP e CSV distribuído pela fonte.
-
-#### Scenario: Participante oficial encontrado pelo CNPJ normalizado
-- **WHEN** o cadastro recebe um CNPJ formatado que corresponde a um participante do dataset oficial
-- **THEN** o sistema compara o identificador normalizado e usa o registro correspondente para decidir a validação
-
-#### Scenario: Participante não encontrado
-- **WHEN** nenhum registro oficial corresponde ao CNPJ normalizado
-- **THEN** o sistema responde `422 Unprocessable Entity` e não persiste a corretora
+## MODIFIED Requirements
 
 ### Requirement: Critério de aceitação de corretora perante a CVM
 O sistema SHALL considerar todos os registros oficiais com o mesmo CNPJ normalizado antes de decidir a aceitação. No campo `SIT` do dataset `cad_intermed.csv`, a situação semanticamente ativa SHALL corresponder ao valor normalizado `EM FUNCIONAMENTO NORMAL`. A instituição SHALL ser aceita quando existir ao menos um registro nessa situação cuja categoria pertença às famílias Corretora ou Distribuidora de títulos e valores mobiliários. O sistema MUST rejeitar o CNPJ quando não existir registro elegível, inclusive quando todos os registros estiverem `CANCELADA`, `LIQUIDAÇÃO EXTRAJUDICIAL`, possuírem situação ausente ou desconhecida, tiverem categoria ausente ou categoria diferente dessas duas famílias, como bancos, custodiantes, depositários, cooperativas, entidades administradoras e escrituradores. A decisão e o registro representativo retornado ao serviço SHALL ser determinísticos e independentes da ordem das linhas do CSV. A elegibilidade MUST NOT depender de whitelist, CNPJ ou nome específico de instituição.
@@ -43,21 +26,3 @@ O sistema SHALL considerar todos os registros oficiais com o mesmo CNPJ normaliz
 #### Scenario: Regressão da XP com múltiplas categorias
 - **WHEN** o CNPJ normalizado `02332886000104`, correspondente à XP INVESTIMENTOS CCTVM S.A., possui registros em múltiplas categorias, incluindo um registro `CORRETORAS` com `SIT = EM FUNCIONAMENTO NORMAL`
 - **THEN** o sistema considera a instituição elegível porque existe pelo menos um registro compatível, sem depender de regra específica para a XP
-
-### Requirement: Disponibilidade e atualização controlada da fonte CVM
-O sistema SHALL reutilizar em memória um snapshot processado do dataset oficial durante uma janela de atualização configurável, evitando novo download e processamento completo a cada cadastro. A primeira consulta após expiração da janela SHALL atualizar o snapshot antes de avaliar o participante.
-
-#### Scenario: Consultas dentro da janela de atualização
-- **WHEN** mais de um cadastro consulta a CVM enquanto o snapshot ainda está válido
-- **THEN** o sistema reutiliza os dados processados sem baixar novamente o dataset
-
-#### Scenario: Atualização da fonte indisponível
-- **WHEN** o snapshot precisa ser atualizado e a fonte CVM apresenta timeout, falha de conexão, indisponibilidade ou limitação externa
-- **THEN** o sistema responde `503 Service Unavailable`, não persiste a corretora e não expõe detalhes internos da fonte
-
-### Requirement: Conteúdo externo seguro e compatível
-O sistema SHALL rejeitar conteúdo CVM que não possa ser interpretado conforme o contrato do dataset oficial, sem inferir registros ou aprovar participantes por dados parciais.
-
-#### Scenario: Dataset incompatível
-- **WHEN** o arquivo recebido não contém a estrutura necessária para identificar CNPJ, situação e categoria do participante
-- **THEN** o sistema responde `502 Bad Gateway` e não persiste a corretora

@@ -46,11 +46,11 @@ class CvmParticipantAdapterTest {
         MutableClock clock = new MutableClock();
         CvmParticipantAdapter adapter = adapter(clock);
         server.expect(requestTo("http://cvm.test/cad_intermed.zip")).andExpect(method(GET))
-                .andRespond(withSuccess(zip("CNPJ;SIT;TP_REGISTRO\n11.222.333/0001-81;ATIVO;CORRETORA DE TITULOS E VALORES MOBILIARIOS\n", true), MediaType.APPLICATION_OCTET_STREAM));
+                .andRespond(withSuccess(zip("CNPJ;SIT;TP_REGISTRO\n11.222.333/0001-81;EM FUNCIONAMENTO NORMAL;CORRETORA DE TITULOS E VALORES MOBILIARIOS\n", true), MediaType.APPLICATION_OCTET_STREAM));
 
         Optional<CvmParticipantData> participant = adapter.consultar("11.222.333/0001-81");
 
-        assertThat(participant).contains(new CvmParticipantData("11222333000181", "ATIVO", "CORRETORA DE TITULOS E VALORES MOBILIARIOS"));
+        assertThat(participant).contains(new CvmParticipantData("11222333000181", "EM FUNCIONAMENTO NORMAL", "CORRETORA DE TITULOS E VALORES MOBILIARIOS"));
     }
 
     @Test
@@ -71,15 +71,15 @@ class CvmParticipantAdapterTest {
         MutableClock clock = new MutableClock();
         CvmParticipantAdapter adapter = adapter(clock);
         server.expect(requestTo("http://cvm.test/cad_intermed.zip"))
-                .andRespond(withSuccess(zip("CNPJ;SIT;TP_REGISTRO\n11222333000181;ATIVO;CORRETORA\n", false), MediaType.APPLICATION_OCTET_STREAM));
+                .andRespond(withSuccess(zip("CNPJ;SIT;TP_REGISTRO\n11222333000181;EM FUNCIONAMENTO NORMAL;CORRETORA\n", false), MediaType.APPLICATION_OCTET_STREAM));
         server.expect(requestTo("http://cvm.test/cad_intermed.zip"))
-                .andRespond(withSuccess(zip("CNPJ;SIT;TP_REGISTRO\n11222333000181;ATIVO;DISTRIBUIDORA\n", false), MediaType.APPLICATION_OCTET_STREAM));
+                .andRespond(withSuccess(zip("CNPJ;SIT;TP_REGISTRO\n11222333000181;EM FUNCIONAMENTO NORMAL;DISTRIBUIDORA\n", false), MediaType.APPLICATION_OCTET_STREAM));
 
         assertThat(adapter.consultar("11222333000181")).isPresent();
         assertThat(adapter.consultar("11222333000181")).isPresent();
         clock.advance(Duration.ofHours(24));
 
-        assertThat(adapter.consultar("11222333000181")).contains(new CvmParticipantData("11222333000181", "ATIVO", "DISTRIBUIDORA"));
+        assertThat(adapter.consultar("11222333000181")).contains(new CvmParticipantData("11222333000181", "EM FUNCIONAMENTO NORMAL", "DISTRIBUIDORA"));
     }
 
     @Test
@@ -93,8 +93,8 @@ class CvmParticipantAdapterTest {
 
     @Test
     void decideRegistrosRepetidosIndependentementeDaOrdemDoCsv() throws Exception {
-        String invalidThenValid = "CNPJ;SIT;TP_REGISTRO\n11222333000181;INATIVO;BANCO\n11222333000181;ATIVO;CORRETORA\n";
-        String validThenInvalid = "CNPJ;SIT;TP_REGISTRO\n11222333000181;ATIVO;CORRETORA\n11222333000181;INATIVO;BANCO\n";
+        String invalidThenValid = "CNPJ;SIT;TP_REGISTRO\n11222333000181;CANCELADA;BANCO\n11222333000181;EM FUNCIONAMENTO NORMAL;CORRETORA\n";
+        String validThenInvalid = "CNPJ;SIT;TP_REGISTRO\n11222333000181;EM FUNCIONAMENTO NORMAL;CORRETORA\n11222333000181;CANCELADA;BANCO\n";
 
         CvmParticipantAdapter first = adapter(new MutableClock());
         server.expect(requestTo("http://cvm.test/cad_intermed.zip")).andRespond(withSuccess(zip(invalidThenValid, false), MediaType.APPLICATION_OCTET_STREAM));
@@ -106,16 +106,40 @@ class CvmParticipantAdapterTest {
         Optional<CvmParticipantData> secondResult = second.consultar("11222333000181");
 
         assertThat(firstResult).isEqualTo(secondResult);
-        assertThat(firstResult).contains(new CvmParticipantData("11222333000181", "ATIVO", "CORRETORA"));
+        assertThat(firstResult).contains(new CvmParticipantData("11222333000181", "EM FUNCIONAMENTO NORMAL", "CORRETORA"));
+    }
+
+    @Test
+    void consideraXpElegivelQuandoUmDosRegistrosEhCorretoraEmFuncionamentoNormal() throws Exception {
+        String cnpj = "02332886000104";
+        String header = "TP_PARTIC;CNPJ;DENOM_SOCIAL;SIT\n";
+        String corretora = "CORRETORAS;02.332.886/0001-04;XP INVESTIMENTOS CCTVM S.A.;EM FUNCIONAMENTO NORMAL\n";
+        String custodiante = "CUSTODIANTES DE VALORES MOBILIÁRIOS;02.332.886/0001-04;XP INVESTIMENTOS CCTVM S.A.;EM FUNCIONAMENTO NORMAL\n";
+        String escriturador = "ESCRITURADORES DE VALORES MOBILIÁRIOS;02.332.886/0001-04;XP INVESTIMENTOS CCTVM S.A.;EM FUNCIONAMENTO NORMAL\n";
+
+        CvmParticipantAdapter first = adapter(new MutableClock());
+        server.expect(requestTo("http://cvm.test/cad_intermed.zip"))
+                .andRespond(withSuccess(zip(header + custodiante + escriturador + corretora, false), MediaType.APPLICATION_OCTET_STREAM));
+        Optional<CvmParticipantData> firstResult = first.consultar(cnpj);
+        server.verify();
+
+        CvmParticipantAdapter second = adapter(new MutableClock());
+        server.expect(requestTo("http://cvm.test/cad_intermed.zip"))
+                .andRespond(withSuccess(zip(header + corretora + escriturador + custodiante, false), MediaType.APPLICATION_OCTET_STREAM));
+        Optional<CvmParticipantData> secondResult = second.consultar(cnpj);
+
+        assertThat(firstResult).isEqualTo(secondResult);
+        assertThat(firstResult).contains(new CvmParticipantData(cnpj, "EM FUNCIONAMENTO NORMAL", "CORRETORAS"));
+        assertThat(firstResult).get().matches(CvmParticipantEligibility::isEligible);
     }
 
     @Test
     void mantemRepresentanteDeterministicoQuandoNenhumRegistroEhElegivel() throws Exception {
         CvmParticipantAdapter adapter = adapter(new MutableClock());
-        server.expect(requestTo("http://cvm.test/cad_intermed.zip")).andRespond(withSuccess(zip("CNPJ;SIT;TP_REGISTRO\n11222333000181;INATIVO;BANCO\n11222333000181;ATIVO;CUSTODIANTE\n", false), MediaType.APPLICATION_OCTET_STREAM));
+        server.expect(requestTo("http://cvm.test/cad_intermed.zip")).andRespond(withSuccess(zip("CNPJ;SIT;TP_REGISTRO\n11222333000181;CANCELADA;BANCO\n11222333000181;EM FUNCIONAMENTO NORMAL;CUSTODIANTE\n", false), MediaType.APPLICATION_OCTET_STREAM));
 
         assertThat(adapter.consultar("11222333000181"))
-                .contains(new CvmParticipantData("11222333000181", "ATIVO", "CUSTODIANTE"));
+                .contains(new CvmParticipantData("11222333000181", "CANCELADA", "BANCO"));
     }
 
     @Test

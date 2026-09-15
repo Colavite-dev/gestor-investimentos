@@ -285,6 +285,6 @@ class CorretoraControllerTest {
 
     private void acceptCvm() {
         when(cvmParticipantProvider.consultar("11222333000181"))
-                .thenReturn(Optional.of(new CvmParticipantData("11222333000181", "ATIVO", "CORRETORA")));
+                .thenReturn(Optional.of(new CvmParticipantData("11222333000181", "EM FUNCIONAMENTO NORMAL", "CORRETORA")));
     }
 }

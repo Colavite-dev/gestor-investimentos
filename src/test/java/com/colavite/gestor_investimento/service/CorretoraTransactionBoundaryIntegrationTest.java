@@ -60,7 +60,7 @@ class CorretoraTransactionBoundaryIntegrationTest {
         });
         when(cvmParticipantProvider.consultar(CNPJ)).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
-            return Optional.of(new CvmParticipantData(CNPJ, "ATIVO", "CORRETORA"));
+            return Optional.of(new CvmParticipantData(CNPJ, "EM FUNCIONAMENTO NORMAL", "CORRETORA"));
         });
         when(repository.saveAndFlush(any(Corretora.class))).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
