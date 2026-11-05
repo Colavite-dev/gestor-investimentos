@@ -76,6 +76,8 @@ npm run lint
 
 Os testes normais usam H2, Flyway e doubles/mocks; não dependem de Docker, internet ou credenciais externas. Testes PostgreSQL e testes reais de providers são opt-in.
 
+A verificação do backend também aplica os limites mínimos JaCoCo de 80% de cobertura de linhas e 55% de ramificações. Após `verify`, consulte o relatório HTML em `target/site/jacoco/index.html` ou o relatório XML em `target/site/jacoco/jacoco.xml`. O build falha se qualquer um dos limites não for atingido.
+
 ## Endpoints
 
 Todos os endpoints, exceto registro e login, exigem `Authorization: Bearer <token>`.

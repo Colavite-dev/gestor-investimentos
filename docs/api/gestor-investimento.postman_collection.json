@@ -11,6 +11,8 @@
     { "key": "demoEmail", "value": "" },
     { "key": "corretoraId", "value": "1" },
     { "key": "cnpj", "value": "19131243000197" },
+    { "key": "cnpjInvalido", "value": "11111111111111" },
+    { "key": "corretoraIdInexistente", "value": "9223372036854775807" },
     { "key": "acaoId", "value": "1" },
     { "key": "ticker", "value": "PETR4" },
     { "key": "mercado", "value": "BRASIL" },
@@ -70,10 +72,126 @@
     {
       "name": "Corretoras",
       "item": [
-        { "name": "Cadastrar", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"cnpj\": \"{{cnpj}}\"\n}" }, "url": "{{baseUrl}}/corretoras" } },
-        { "name": "Listar", "request": { "method": "GET", "url": "{{baseUrl}}/corretoras" } },
-        { "name": "Buscar por ID", "request": { "method": "GET", "url": "{{baseUrl}}/corretoras/{{corretoraId}}" } },
-        { "name": "Buscar por CNPJ", "request": { "method": "GET", "url": "{{baseUrl}}/corretoras/cnpj/{{cnpj}}" } }
+        {
+          "name": "Cadastrar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cnpj\": \"{{cnpj}}\"\n}"
+            },
+            "url": "{{baseUrl}}/corretoras"
+          }
+        },
+        {
+          "name": "Validar CNPJ inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cnpj\": \"{{cnpjInvalido}}\"\n}"
+            },
+            "url": "{{baseUrl}}/corretoras"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Entrada inválida retorna 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cadastrar CNPJ duplicado",
+          "description": "Pré-condição: execute primeiro “Cadastrar” com o mesmo {{cnpj}} e com a mesma conta autenticada. Repetir o cadastro deve ser recusado antes de consultar provedores externos.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cnpj\": \"{{cnpj}}\"\n}"
+            },
+            "url": "{{baseUrl}}/corretoras"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"CNPJ duplicado retorna 409\", function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/corretoras"
+          }
+        },
+        {
+          "name": "Buscar por ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/corretoras/{{corretoraId}}"
+          }
+        },
+        {
+          "name": "Buscar por CNPJ",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/corretoras/cnpj/{{cnpj}}"
+          }
+        },
+        {
+          "name": "Buscar ID inexistente",
+          "description": "Exemplo de recurso inexistente. Usa um ID positivo muito alto que não corresponde a um recurso criado pela aplicação.",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/corretoras/{{corretoraIdInexistente}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Recurso inexistente retorna 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
       ]
     },
     {
